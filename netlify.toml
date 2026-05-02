@@ -1,0 +1,20 @@
+[build]
+  publish = "."
+  command = ""
+
+[functions]
+  directory = "netlify/functions"
+
+# Python runtime の設定 (stats.py 用)
+[[plugins]]
+  # Python 関数は netlify/functions/stats.py として自動認識
+
+# リダイレクト: / → index.html
+[[redirects]]
+  from = "/"
+  to   = "/index.html"
+  status = 200
+
+# 環境変数は Netlify ダッシュボードで設定:
+# SUPABASE_URL         = https://lenidmfcvgpqvwobnepo.supabase.co
+# SUPABASE_SERVICE_KEY = (Supabase > Settings > API > service_role key)

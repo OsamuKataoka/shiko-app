@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAW Lab 嗜好試験管理システム</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ======== Sidebar ======== -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="paw">🐾</div>
+    <h2>PAW Lab<br>嗜好試験管理</h2>
+    <small>Palatability Assessment</small>
+  </div>
+
+  <!-- 猫 -->
+  <div class="nav-group">
+    <div class="nav-group-header" onclick="toggleGroup('cat')">
+      <span>🐱</span> <span>猫</span> <span class="badge">CAT</span>
+    </div>
+    <div class="nav-group-children" id="group-cat">
+      <div class="nav-item" data-section="trial" data-species="cat" data-location="R" onclick="navigate(this)">
+        試験計画 R (RDC)
+      </div>
+      <div class="nav-item" data-section="trial" data-species="cat" data-location="O" onclick="navigate(this)">
+        試験計画 O (大阪)
+      </div>
+      <div class="nav-item" data-section="result-list" data-species="cat" onclick="navigate(this)">
+        結果一覧
+      </div>
+    </div>
+  </div>
+
+  <!-- 犬 -->
+  <div class="nav-group">
+    <div class="nav-group-header" onclick="toggleGroup('dog')">
+      <span>🐶</span> <span>犬</span> <span class="badge">DOG</span>
+    </div>
+    <div class="nav-group-children" id="group-dog">
+      <div class="nav-item" data-section="trial" data-species="dog" data-location="" onclick="navigate(this)">
+        試験計画 (RDC)
+      </div>
+      <div class="nav-item" data-section="trial" data-species="dog" data-location="I" onclick="navigate(this)">
+        試験計画 I (専門学校)
+      </div>
+      <div class="nav-item" data-section="result-list" data-species="dog" onclick="navigate(this)">
+        結果一覧
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理 -->
+  <div class="nav-group">
+    <div class="nav-group-header" onclick="toggleGroup('mgmt')">
+      <span>⚙️</span> <span>管理</span>
+    </div>
+    <div class="nav-group-children" id="group-mgmt">
+      <div class="nav-item" data-section="materials" onclick="navigate(this)">
+        RDC原料在庫管理
+      </div>
+      <div class="nav-item" data-section="dropdowns" onclick="navigate(this)">
+        選択肢一覧
+      </div>
+      <div class="nav-item" data-section="prep-checklist" onclick="navigate(this)">
+        調製用紙チェック
+      </div>
+      <div class="nav-item" data-section="stat-settings" onclick="navigate(this)">
+        統計解析設定
+      </div>
+      <div class="nav-item" data-section="result-columns" onclick="navigate(this)">
+        結果一覧表示設定
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="user-info" id="userEmail">...</div>
+    <button class="btn-logout" onclick="doLogout()">ログアウト</button>
+  </div>
+</nav>
+
+<!-- ======== Main ======== -->
+<div id="main">
+  <header id="header">
+    <span id="pageTitle">読込中...</span>
+    <span class="header-species-badge" id="speciesBadge" style="display:none"></span>
+  </header>
+  <div id="content">
+    <div class="loading-wrap"><div class="spinner"></div>読込中...</div>
+  </div>
+</div>
+
+<!-- ======== Toast ======== -->
+<div id="toast-container"></div>
+
+<!-- ======== Modals (rendered by JS) ======== -->
+<div id="modal-container"></div>
+
+<!-- ======== Scripts ======== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/trial-plan.js"></script>
+<script src="js/prep-sheet.js"></script>
+<script src="js/results.js"></script>
+<script src="js/management.js"></script>
+</body>
+</html>

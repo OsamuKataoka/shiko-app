@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAW Lab 嗜好試験管理システム</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-wrap {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      padding: 48px 40px 40px;
+      width: 380px;
+      max-width: 95vw;
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .login-logo .paw { font-size: 40px; margin-bottom: 8px; }
+    .login-logo h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a2e;
+      line-height: 1.4;
+    }
+    .login-logo p { font-size: 12px; color: #888; margin-top: 4px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
+    input[type="email"], input[type="password"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #d0d5dd;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 16px;
+    }
+    input:focus { border-color: #4f6ef7; }
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      background: #4f6ef7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-login:hover { background: #3a57e8; }
+    .btn-login:disabled { background: #a0aec0; cursor: not-allowed; }
+    .error-msg {
+      background: #fff0f0;
+      color: #c00;
+      border: 1px solid #fcc;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .loading-spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.5);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-logo">
+      <div class="paw">🐾</div>
+      <h1>PAW Lab<br>嗜好試験管理システム</h1>
+      <p>Palatability Assessment Workspace</p>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+    <label for="email">メールアドレス</label>
+    <input type="email" id="email" placeholder="example@nosan.co.jp" autocomplete="email">
+    <label for="password">パスワード</label>
+    <input type="password" id="password" placeholder="パスワード" autocomplete="current-password">
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">ログイン</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script>
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 既にログイン済みなら app.html へ
+    sb.auth.getSession().then(({ data }) => {
+      if (data.session) location.href = 'app.html';
+    });
+
+    document.getElementById('password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    async function doLogin() {
+      const email = document.getElementById('email').value.trim();
+      const pwd   = document.getElementById('password').value;
+      const btn   = document.getElementById('loginBtn');
+      const err   = document.getElementById('errorMsg');
+
+      if (!email || !pwd) { showErr('メールアドレスとパスワードを入力してください'); return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading-spinner"></span>ログイン中...';
+      err.style.display = 'none';
+
+      const { error } = await sb.auth.signInWithPassword({ email, password: pwd });
+      if (error) {
+        showErr('ログインに失敗しました: ' + error.message);
+        btn.disabled = false;
+        btn.textContent = 'ログイン';
+      } else {
+        location.href = 'app.html';
+      }
+    }
+
+    function showErr(msg) {
+      const err = document.getElementById('errorMsg');
+      err.textContent = msg;
+      err.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
