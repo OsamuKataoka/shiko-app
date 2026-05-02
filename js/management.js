@@ -449,8 +449,8 @@ async function renderStatSettings() {
 
   setContent(`
     <div class="tab-bar">
-      <button class="tab-btn${_statTab==='cat'?' active':''}" onclick="_statTab='cat';renderStatSettings()">🐱 猫</button>
-      <button class="tab-btn${_statTab==='dog'?' active':''}" onclick="_statTab='dog';renderStatSettings()">🐶 犬</button>
+      <button class="tab-btn${_statTab==='cat'?' active':''}" onclick="_statTab='cat';renderStatSettings()">猫</button>
+      <button class="tab-btn${_statTab==='dog'?' active':''}" onclick="_statTab='dog';renderStatSettings()">犬</button>
     </div>
     ${renderStatForm(_statTab === 'cat' ? catSt : dogSt, _statTab)}
   `);
@@ -458,6 +458,46 @@ async function renderStatSettings() {
 
 function renderStatForm(s, species) {
   return `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title">解析フロー</span></div>
+      <div class="card-body" style="font-size:13px;line-height:1.8">
+        <div style="background:var(--gray-50,#f8f9fa);border:1px solid var(--gray-200,#e2e8f0);border-radius:8px;padding:14px">
+          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px">
+            <span style="background:#3b82f6;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;white-space:nowrap">STEP 1</span>
+            <div>
+              <b>正規性検定手法：Shapiro-Wilk 検定</b><br>
+              <span style="color:var(--gray-500,#64748b)">○採食比と●採食比の差（各個体）が正規分布に従うか検定します。<br>
+              p値 &lt; α（正規性判定閾値）→ <b>非正規分布</b> と判定</span>
+            </div>
+          </div>
+          <div style="margin-left:16px;border-left:2px solid var(--gray-300,#cbd5e1);padding-left:12px;margin-bottom:10px">
+            <div style="margin-bottom:8px">
+              <span style="color:#16a34a;font-weight:600">正規分布 → 対応のあるT検定（Paired T-test）</span><br>
+              <span style="color:var(--gray-500,#64748b);font-size:12px">個体ごとの差の平均が0かどうかを検定。左右対称な分布を前提とします。</span>
+            </div>
+            <div>
+              <span style="color:#dc2626;font-weight:600">非正規分布 → ウィルコクソン符号順位和検定（Wilcoxon Signed-Rank Test）</span><br>
+              <span style="color:var(--gray-500,#64748b);font-size:12px">差の順位を使ったノンパラメトリック検定。正規性を仮定しない頑健な手法です。</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <span style="background:#8b5cf6;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;white-space:nowrap">STEP 2</span>
+            <div>
+              <b>効果量（効果の大きさ）の計算</b><br>
+              <div style="margin-top:4px">
+                <span style="color:#16a34a;font-weight:600">T検定の場合 → Cohen's dz</span>
+                <span style="color:var(--gray-500,#64748b);font-size:12px"> = 差の平均 ÷ 差の標準偏差。|dz| ≥ 0.8 で大きな効果。</span>
+              </div>
+              <div>
+                <span style="color:#dc2626;font-weight:600">ウィルコクソンの場合 → rank-biserial（順位双列相関）</span>
+                <span style="color:var(--gray-500,#64748b);font-size:12px"> = 2W / n(n+1) − 1。−1〜+1 の範囲。|r| ≥ 0.8 で大きな効果。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-header">
         <span class="card-title">${species === 'cat' ? '猫' : '犬'} 統計解析設定</span>
@@ -472,15 +512,16 @@ function renderStatForm(s, species) {
             <small style="font-size:11px;color:var(--gray-400)">現在はShapiro-Wilkのみ対応</small>
           </div>
           <div class="form-group">
-            <label>正規性判定 有意水準 (α)</label>
+            <label>正規性判定 有意水準 α（正規/非正規の境界）</label>
             <input type="number" class="form-control" id="st-norm-alpha" step="0.01" min="0.01" max="0.20"
               value="${s.normality_alpha ?? 0.05}">
-            <small style="font-size:11px;color:var(--gray-400)">p &lt; α → 非正規 → ウィルコクソン</small>
+            <small style="font-size:11px;color:var(--gray-400)">p &lt; α → 非正規 → ウィルコクソン符号順位和検定を使用</small>
           </div>
           <div class="form-group">
-            <label>有意差判定 有意水準 (α)</label>
+            <label>有意差判定 有意水準 α（○●フードに差があるかの境界）</label>
             <input type="number" class="form-control" id="st-sig-alpha" step="0.01" min="0.01" max="0.20"
               value="${s.significance_alpha ?? 0.05}">
+            <small style="font-size:11px;color:var(--gray-400)">p &lt; α → 有意差あり（T検定・ウィルコクソン共通）</small>
           </div>
           <div class="form-group">
             <label>集計方法</label>
@@ -494,29 +535,33 @@ function renderStatForm(s, species) {
             <label>除外基準 最小摂食率 (%)</label>
             <input type="number" class="form-control" id="st-exc-min" step="1" min="0"
               value="${s.exclusion_min_ratio ?? 10}">
-            <small style="font-size:11px;color:var(--gray-400)">両フード合計摂食率がこの値未満の個体を除外</small>
+            <small style="font-size:11px;color:var(--gray-400)">○●合計摂食率がこの値未満の個体を統計解析から除外</small>
           </div>
           <div class="form-group">
             <label>警告基準 最大摂食率 (%)</label>
             <input type="number" class="form-control" id="st-exc-max" step="1" min="0"
               value="${s.exclusion_max_ratio ?? 130}">
-            <small style="font-size:11px;color:var(--gray-400)">この値を超える個体に警告表示</small>
+            <small style="font-size:11px;color:var(--gray-400)">この値を超える個体に警告表示（食べ過ぎ）</small>
           </div>
           <div class="form-group">
             <label>効果量計算方法</label>
             <select class="form-control" id="st-effect">
-              <option value="auto"           ${s.effect_size_method==='auto'          ?'selected':''}>自動選択（検定に合わせる）</option>
-              <option value="cohen_dz"       ${s.effect_size_method==='cohen_dz'      ?'selected':''}>Cohen's dz（T検定用）</option>
-              <option value="rank_biserial"  ${s.effect_size_method==='rank_biserial' ?'selected':''}>rank-biserial（ウィルコクソン用）</option>
+              <option value="auto"           ${s.effect_size_method==='auto'          ?'selected':''}>自動（T検定 → Cohen's dz ／ ウィルコクソン → rank-biserial）</option>
+              <option value="cohen_dz"       ${s.effect_size_method==='cohen_dz'      ?'selected':''}>Cohen's dz のみ（正規分布・T検定用）</option>
+              <option value="rank_biserial"  ${s.effect_size_method==='rank_biserial' ?'selected':''}>rank-biserial のみ（ウィルコクソン符号順位和検定用）</option>
             </select>
           </div>
           <div class="form-group">
-            <label>効果量 閾値 (small / medium / large)</label>
-            <div style="display:flex;gap:8px">
+            <label>効果量 閾値（小 / 中 / 大）</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-size:11px;color:var(--gray-500)">小</span>
               <input type="number" class="form-control" id="st-ef-sm" step="0.05" value="${s.effect_small_threshold ?? 0.2}" placeholder="small">
+              <span style="font-size:11px;color:var(--gray-500)">中</span>
               <input type="number" class="form-control" id="st-ef-md" step="0.05" value="${s.effect_medium_threshold ?? 0.5}" placeholder="medium">
+              <span style="font-size:11px;color:var(--gray-500)">大</span>
               <input type="number" class="form-control" id="st-ef-lg" step="0.05" value="${s.effect_large_threshold ?? 0.8}" placeholder="large">
             </div>
+            <small style="font-size:11px;color:var(--gray-400)">Cohen's dz・rank-biserial 共通の閾値。例: 0.2 / 0.5 / 0.8</small>
           </div>
         </div>
         <div class="form-group" style="margin-top:14px">

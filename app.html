@@ -12,16 +12,16 @@
 <nav id="sidebar">
   <div class="sidebar-logo">
     <div class="paw">🐾</div>
-    <h2>PAW Lab<br>嗜好試験管理</h2>
+    <h2>PAW Lab<br>嗜好試験管理システム</h2>
     <small>Palatability Assessment</small>
   </div>
 
   <!-- 猫 -->
   <div class="nav-group">
     <div class="nav-group-header" onclick="toggleGroup('cat')">
-      <span>🐱</span> <span>猫</span> <span class="badge">CAT</span>
+      <span>猫</span> <span class="badge">CAT</span>
     </div>
-    <div class="nav-group-children" id="group-cat">
+    <div class="nav-group-children open" id="group-cat">
       <div class="nav-item" data-section="trial" data-species="cat" data-location="R" onclick="navigate(this)">
         試験計画 R (RDC)
       </div>
@@ -37,9 +37,9 @@
   <!-- 犬 -->
   <div class="nav-group">
     <div class="nav-group-header" onclick="toggleGroup('dog')">
-      <span>🐶</span> <span>犬</span> <span class="badge">DOG</span>
+      <span>犬</span> <span class="badge">DOG</span>
     </div>
-    <div class="nav-group-children" id="group-dog">
+    <div class="nav-group-children open" id="group-dog">
       <div class="nav-item" data-section="trial" data-species="dog" data-location="" onclick="navigate(this)">
         試験計画 (RDC)
       </div>
@@ -55,9 +55,9 @@
   <!-- 管理 -->
   <div class="nav-group">
     <div class="nav-group-header" onclick="toggleGroup('mgmt')">
-      <span>⚙️</span> <span>管理</span>
+      <span>管理</span>
     </div>
-    <div class="nav-group-children" id="group-mgmt">
+    <div class="nav-group-children open" id="group-mgmt">
       <div class="nav-item" data-section="materials" onclick="navigate(this)">
         RDC原料在庫管理
       </div>
