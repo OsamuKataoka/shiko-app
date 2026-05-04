@@ -43,10 +43,10 @@ async function openPrepSheet(trialId) {
 
   const html = `
     <div class="no-print" style="display:flex;gap:8px;margin-bottom:16px">
-      <button class="btn btn-secondary" onclick="renderTrialPlan('${species}','${location}')">← 試験一覧へ</button>
+      <button class="btn btn-secondary" onclick="renderTrialPlan('${species}')">← 試験一覧へ</button>
       <div style="flex:1"></div>
       <button class="btn btn-success" onclick="savePrepAnimals()">個体・給与量を保存</button>
-      <button class="btn btn-primary" onclick="window.print()">🖨️ 印刷</button>
+      <button class="btn btn-primary" onclick="window.print()">印刷</button>
     </div>
 
     <div class="prep-sheet" id="prepSheetBody">
@@ -78,7 +78,7 @@ function renderPrepHeader(checklist, foodType, species, location, ingA, ingB) {
     </div>
     <div><strong>目的:</strong> ${escHtml(t.purpose||'')} &emsp; <strong>備考:</strong> ${escHtml(t.notes||'')}</div>
 
-    <div class="section-title">調整 <small style="font-weight:400;font-size:11px">（納期: <input class="table-input" style="width:120px" id="prep-deadline" placeholder="日付を入力"> まで）</small></div>
+    <div class="section-title">調整 <small style="font-weight:400;font-size:11px">（納期: <input type="date" class="table-input" style="width:140px" id="prep-deadline"> まで）</small></div>
     <table class="prep-table">
       <thead>
         <tr>
@@ -105,7 +105,7 @@ function renderPrepHeader(checklist, foodType, species, location, ingA, ingB) {
     </div>
 
     <div style="margin-top:10px;display:flex;gap:40px">
-      <div><strong>調製日:</strong> <input class="table-input" style="width:120px" placeholder="　　　　　"></div>
+      <div><strong>調製日:</strong> <input type="date" class="table-input" style="width:150px" id="prep-make-date"></div>
       <div><strong>調製者名:</strong> <input class="table-input" style="width:120px" placeholder="　　　　　"></div>
     </div>
   `;
@@ -153,8 +153,8 @@ function renderPrepAnimalTableDry() {
     <div class="section-title">
       試験実施日
       <span style="font-weight:400;font-size:11px">
-        1回目: <input class="table-input" style="width:100px" id="prep-date1" placeholder="YYYY-MM-DD">
-        2回目: <input class="table-input" style="width:100px" id="prep-date2" placeholder="YYYY-MM-DD">
+        1回目: <input type="date" class="table-input" style="width:140px" id="prep-date1" value="${_prepTrial?.trial_date_start || ''}">
+        2回目: <input type="date" class="table-input" style="width:140px" id="prep-date2" value="${_prepTrial?.trial_date_end && _prepTrial.trial_date_end !== _prepTrial.trial_date_start ? _prepTrial.trial_date_end : ''}">
       </span>
     </div>
     <div class="no-print" style="margin-bottom:8px">
@@ -207,8 +207,8 @@ function renderPrepAnimalTableWet() {
     <div class="section-title">
       試験実施日
       <span style="font-weight:400;font-size:11px">
-        1回目: <input class="table-input" style="width:100px" id="prep-date1" placeholder="YYYY-MM-DD">
-        2回目: <input class="table-input" style="width:100px" id="prep-date2" placeholder="YYYY-MM-DD">
+        1回目: <input type="date" class="table-input" style="width:140px" id="prep-date1" value="${_prepTrial?.trial_date_start || ''}">
+        2回目: <input type="date" class="table-input" style="width:140px" id="prep-date2" value="${_prepTrial?.trial_date_end && _prepTrial.trial_date_end !== _prepTrial.trial_date_start ? _prepTrial.trial_date_end : ''}">
       </span>
     </div>
     <div class="no-print" style="margin-bottom:8px">

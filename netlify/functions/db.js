@@ -33,6 +33,38 @@ exports.handler = async (event) => {
       const { error } = await sb.from(table).delete().eq('id', id);
       if (error) throw error;
       result = { ok: true };
+
+    // ── User management (auth admin) ──────────────────────
+    } else if (action === 'list-users') {
+      const { data: d, error } = await sb.auth.admin.listUsers({ page: 1, perPage: 200 });
+      if (error) throw error;
+      result = d.users.map(u => ({
+        id:               u.id,
+        email:            u.email,
+        display_name:     u.user_metadata?.display_name || '',
+        role:             u.user_metadata?.app_role || 'general',
+        created_at:       u.created_at,
+        last_sign_in_at:  u.last_sign_in_at,
+      }));
+    } else if (action === 'invite-user') {
+      const { data: d, error } = await sb.auth.admin.inviteUserByEmail(data.email, {
+        data: { display_name: data.display_name, app_role: data.app_role || 'general' },
+      });
+      if (error) throw error;
+      result = { ok: true, id: d.user?.id };
+    } else if (action === 'update-user') {
+      const updatePayload = {
+        user_metadata: { display_name: data.display_name, app_role: data.app_role },
+      };
+      if (data.password) updatePayload.password = data.password;
+      const { data: d, error } = await sb.auth.admin.updateUserById(id, updatePayload);
+      if (error) throw error;
+      result = { ok: true, id: d.user?.id };
+    } else if (action === 'delete-user') {
+      const { error } = await sb.auth.admin.deleteUser(id);
+      if (error) throw error;
+      result = { ok: true };
+
     } else {
       return { statusCode: 400, body: 'Unknown action' };
     }

@@ -42,22 +42,22 @@ function navigate(el) {
   // ヘッダー更新
   const badge = document.getElementById('speciesBadge');
   if (species === 'cat') {
-    badge.textContent = '🐱 猫'; badge.className = 'header-species-badge badge-cat'; badge.style.display = '';
+    badge.textContent = '猫'; badge.className = 'header-species-badge badge-cat'; badge.style.display = '';
   } else if (species === 'dog') {
-    badge.textContent = '🐶 犬'; badge.className = 'header-species-badge badge-dog'; badge.style.display = '';
+    badge.textContent = '犬'; badge.className = 'header-species-badge badge-dog'; badge.style.display = '';
   } else {
     badge.style.display = 'none';
   }
 
   // セクション描画
   switch (section) {
-    case 'trial':        renderTrialPlan(species, location); break;
-    case 'result-list':  renderResultList(species); break;
-    case 'materials':    renderMaterials(); break;
-    case 'dropdowns':    renderDropdowns(); break;
-    case 'prep-checklist': renderPrepChecklist(); break;
-    case 'stat-settings': renderStatSettings(); break;
-    case 'result-columns': renderResultColumns(); break;
+    case 'trial':           renderTrialPlan(species); break;
+    case 'result-list':     renderResultList(species); break;
+    case 'materials':       renderMaterials(); break;
+    case 'dropdowns':       renderDropdowns(); break;
+    case 'prep-checklist':  renderPrepChecklist(); break;
+    case 'stat-settings':   renderStatSettings(); break;
+    case 'user-management': renderUserManagement(); break;
     default: setContent('<div class="empty-state"><p>準備中</p></div>');
   }
 }
@@ -253,4 +253,16 @@ function buildOptions(vals, selected = '') {
     const s = (String(v) === String(selected)) ? ' selected' : '';
     return `<option value="${escHtml(v)}"${s}>${escHtml(v)}</option>`;
   }).join('');
+}
+
+// ── Netlify Function 呼び出し (service_role 権限が必要な操作) ──
+async function callDb(body) {
+  const r = await fetch('/.netlify/functions/db', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'DB error');
+  return data;
 }

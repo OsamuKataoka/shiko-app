@@ -501,3 +501,88 @@ input.table-input:focus, select.table-input:focus {
   transition: border-color 0.2s;
 }
 .filter-bar input:focus, .filter-bar select:focus { border-color: var(--primary); }
+
+/* ── Filter panel (checkbox groups) ── */
+.filter-panel {
+  background: #fff; border: 1px solid var(--gray-200);
+  border-radius: 10px; padding: 14px 18px; margin-bottom: 14px;
+}
+.filter-panel-title {
+  font-size: 12px; font-weight: 700; color: var(--gray-600);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer;
+}
+.filter-panel-title .toggle-arrow { font-size: 10px; color: var(--gray-400); margin-left: auto; }
+.filter-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 10px; }
+.filter-group { min-width: 120px; }
+.filter-group-label {
+  font-size: 11px; font-weight: 700; color: var(--gray-400);
+  margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.filter-checkboxes { display: flex; flex-wrap: wrap; gap: 5px; }
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; cursor: pointer; padding: 3px 9px;
+  border-radius: 12px; border: 1px solid var(--gray-200);
+  background: #fff; transition: all 0.15s; user-select: none;
+}
+.filter-chip:hover { background: var(--gray-50); }
+.filter-chip.selected {
+  background: var(--primary-light); border-color: var(--primary);
+  color: var(--primary); font-weight: 600;
+}
+.filter-date-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.filter-date-row label { font-size: 11px; color: var(--gray-500); }
+.filter-date-row input[type="date"] {
+  padding: 5px 8px; border: 1.5px solid var(--gray-300); border-radius: 6px;
+  font-size: 12px; outline: none; transition: border-color 0.2s;
+}
+.filter-date-row input[type="date"]:focus { border-color: var(--primary); }
+.filter-keyword input {
+  padding: 6px 12px; border: 1.5px solid var(--gray-300); border-radius: 7px;
+  font-size: 12px; outline: none; width: 200px; transition: border-color 0.2s;
+}
+.filter-keyword input:focus { border-color: var(--primary); }
+.filter-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+
+/* ── Resizable column handle ── */
+.data-table th { position: relative; }
+.col-resizer {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  width: 5px; cursor: col-resize; user-select: none; z-index: 2;
+}
+.col-resizer:hover, .col-resizer.resizing { background: var(--primary); opacity: 0.4; }
+
+/* ── Location tabs (trial plan) ── */
+.location-tab-bar {
+  display: flex; gap: 0; border-bottom: 2px solid var(--gray-200);
+  margin-bottom: 16px; background: #fff;
+}
+.location-tab-btn {
+  padding: 9px 20px; font-size: 13px; font-weight: 600;
+  color: var(--gray-500); border: none; background: none;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; transition: all 0.15s;
+}
+.location-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.location-tab-btn:hover:not(.active) { color: var(--gray-700); }
+
+/* ── Column settings panel ── */
+.col-settings-panel {
+  background: #fff; border: 1px solid var(--gray-200);
+  border-radius: 10px; padding: 14px 18px; margin-bottom: 14px;
+}
+.col-settings-title {
+  font-size: 12px; font-weight: 700; color: var(--gray-600);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 8px; cursor: pointer;
+}
+.col-settings-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px;
+}
+.col-settings-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border: 1px solid var(--gray-200);
+  border-radius: 6px; cursor: pointer; font-size: 12px;
+  transition: background 0.15s;
+}
+.col-settings-item:hover { background: var(--gray-50); }
+.col-settings-item input[type="checkbox"] { cursor: pointer; }

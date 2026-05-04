@@ -5,148 +5,138 @@
 let _trialSortKey  = 'trial_date_start';
 let _trialSortAsc  = false;
 let _trialSpecies  = 'cat';
-let _trialLocation = 'R';
+let _trialLocation = 'R';          // 現在表示中のタブ
 let _editTrialId   = null;
-let _trialsList    = [];   // 現在表示中の試験一覧
-let _ingredientEditors = {}; // { 'A': [...rows], 'B': [...rows] }
+let _trialsList    = [];
+let _ingredientEditors = {};       // { A: [...], B: [...] }
+let _trialTotalWeight  = { A: 0, B: 0 }; // 調製総重量
 
-// ── 試験計画 メイン描画 ──────────────────────────────────
-async function renderTrialPlan(species, location) {
-  _trialSpecies  = species;
-  _trialLocation = location;
+// 猫/犬それぞれのタブ定義
+const TRIAL_TABS = {
+  cat: [
+    { location: 'R', label: '猫 R (RDC)' },
+    { location: 'O', label: '猫 O (大阪)' },
+  ],
+  dog: [
+    { location: '',  label: '犬 (RDC)' },
+    { location: 'I', label: '犬 I (専門学校)' },
+  ],
+};
 
-  const locLabel = locationLabel(species, location);
-  const spLabel  = species === 'cat' ? '猫' : '犬';
-  setTitle(`試験計画 ${locLabel} (${spLabel})`);
+// ── メイン描画 ────────────────────────────────────────────
+async function renderTrialPlan(species) {
+  _trialSpecies = species;
+  if (!_trialLocation && species === 'cat') _trialLocation = 'R';
+  if (species === 'dog' && _trialLocation !== '' && _trialLocation !== 'I') _trialLocation = '';
 
+  const spLabel = species === 'cat' ? '猫 試験計画' : '犬 試験計画';
+  setTitle(spLabel);
   loading();
+  await _renderTrialTab();
+}
 
-  const [trials, ingredients] = await Promise.all([
+async function switchTrialTab(location) {
+  _trialLocation = location;
+  await _renderTrialTab();
+}
+
+async function _renderTrialTab() {
+  const species  = _trialSpecies;
+  const location = _trialLocation;
+  const tabs     = TRIAL_TABS[species] || [];
+
+  const [trials, locations] = await Promise.all([
     dbSelect('pal_trials', {
-      eq: { species, location },
+      eq:    { species, location },
       order: { col: _trialSortKey, asc: _trialSortAsc }
     }),
-    dbSelect('pal_trial_ingredients', { order: { col: 'sort_order', asc: true } })
+    getDropdowns('場所_' + species),
   ]);
-
   _trialsList = trials;
 
-  // 試験ごとに内訳をグループ化
-  const ingMap = {};
-  ingredients.forEach(ing => {
-    if (!ingMap[ing.trial_id]) ingMap[ing.trial_id] = { A: [], B: [] };
-    ingMap[ing.trial_id][ing.side].push(ing);
-  });
+  const tabBar = `
+    <div class="tab-bar" style="margin-bottom:0">
+      ${tabs.map(t => `
+        <button class="tab-btn${t.location===location?' active':''}"
+          onclick="switchTrialTab('${escHtml(t.location)}')">${escHtml(t.label)}</button>
+      `).join('')}
+    </div>`;
 
-  const html = `
-    <div class="sort-bar">
+  const sortBar = `
+    <div class="sort-bar" style="margin-top:12px">
       <label>ソート:</label>
       ${sortBtn('trial_date_start','試験日')}
       ${sortBtn('purpose','目的')}
       ${sortBtn('notes','備考')}
       ${sortBtn('supplier','サプライヤー')}
       <div style="flex:1"></div>
-      <button class="btn btn-primary btn-sm" onclick="openTrialModal()">＋ 新規試験登録</button>
-    </div>
+      <button class="btn btn-primary btn-sm" onclick="openTrialModal()">+ 新規試験登録</button>
+    </div>`;
 
-    <div class="card">
+  const tableHtml = `
+    <div class="card" style="margin-top:0">
       <div class="card-header">
-        <span class="card-title">試験一覧</span>
+        <span class="card-title">${tabs.find(t=>t.location===location)?.label || ''} 試験一覧</span>
         <span style="font-size:12px;color:var(--gray-400)">${trials.length} 件</span>
       </div>
-      <div class="table-wrap">
-        <table class="data-table" id="trialTable">
+      <div class="table-wrap" id="trialTableWrap">
+        <table class="data-table resizable-table" id="trialTable">
           <thead>
             <tr>
-              <th>試験日</th>
-              <th>種別</th>
-              <th>〇 レシピ / 内訳</th>
-              <th>〇重量</th>
-              <th>● レシピ / 内訳</th>
-              <th>●重量</th>
-              <th>担当者</th>
-              <th>目的</th>
-              <th>備考</th>
-              <th>頭数</th>
-              <th>選択率</th>
-              <th>状態</th>
-              <th style="width:120px"></th>
+              <th data-col="date">試験日</th>
+              <th data-col="actions" style="width:130px"></th>
+              <th data-col="status">状態</th>
+              <th data-col="food_type">種別</th>
+              <th data-col="food_a">○ レシピ</th>
+              <th data-col="food_b">● レシピ</th>
+              <th data-col="person">担当者</th>
+              <th data-col="purpose">目的</th>
+              <th data-col="notes">備考</th>
+              <th data-col="supplier">サプライヤー</th>
+              <th data-col="count">頭数</th>
+              <th data-col="pref">選択率</th>
             </tr>
           </thead>
           <tbody>
-            ${trials.length === 0 ? `<tr><td colspan="13" style="text-align:center;color:var(--gray-400);padding:32px">登録された試験はありません</td></tr>` :
-              trials.map(t => renderTrialRows(t, ingMap[t.id] || { A:[], B:[] })).join('')
+            ${trials.length === 0
+              ? `<tr><td colspan="12" style="text-align:center;color:var(--gray-400);padding:32px">登録された試験はありません</td></tr>`
+              : trials.map(t => renderTrialRow(t)).join('')
             }
           </tbody>
         </table>
       </div>
     </div>
-
     ${renderTrialModal()}
-    ${renderIngredientSearchModal()}
-  `;
+    ${renderIngredientSearchModal()}`;
 
-  setContent(html);
+  setContent(tabBar + sortBar + tableHtml);
+  initResizableTable('trialTable');
 }
 
-// ── 試験行 HTML (概要行 + 内訳行) ───────────────────────
-function renderTrialRows(t, ings) {
-  const hasA = ings.A.length > 0;
-  const hasB = ings.B.length > 0;
-  const maxRows = Math.max(ings.A.length, ings.B.length, 1);
-
-  const rows = [];
-
-  // 概要行
-  rows.push(`
+// ── 試験行 HTML（内訳行なし）──────────────────────────────
+function renderTrialRow(t) {
+  return `
     <tr class="trial-row-summary" data-trial-id="${t.id}">
       <td style="white-space:nowrap;font-weight:700">${escHtml(t.trial_date_label || formatDate(t.trial_date_start))}</td>
+      <td class="col-actions" style="white-space:nowrap">
+        <button class="btn btn-xs btn-secondary" onclick="openTrialModal('${t.id}')">編集</button>
+        <button class="btn btn-xs btn-success"   onclick="openPrepSheet('${t.id}')">調製</button>
+        <button class="btn btn-xs btn-danger"    onclick="deleteTrial('${t.id}')">削除</button>
+      </td>
+      <td>${statusBadge(t.status || '計画中')}</td>
       <td>${escHtml(foodTypeLabel(t.food_type))}</td>
-      <td style="max-width:180px">${escHtml(t.food_a_overview || '-')}</td>
-      <td style="text-align:right">${t.food_a_weight_total_g != null ? fmtNum(t.food_a_weight_total_g,0)+'g' : '-'}</td>
-      <td style="max-width:180px">${escHtml(t.food_b_overview || '-')}</td>
-      <td style="text-align:right">${t.food_b_weight_total_g != null ? fmtNum(t.food_b_weight_total_g,0)+'g' : '-'}</td>
+      <td style="max-width:200px;font-size:12px">${escHtml(t.food_a_overview || '-')}</td>
+      <td style="max-width:200px;font-size:12px">${escHtml(t.food_b_overview || '-')}</td>
       <td>${escHtml(t.person_in_charge || '')}</td>
       <td>${escHtml(t.purpose || '')}</td>
       <td style="max-width:120px;font-size:11px">${escHtml(t.notes || '')}</td>
+      <td>${escHtml(t.supplier || '')}</td>
       <td style="text-align:center">${t.animal_count ?? '-'}</td>
       <td>${prefBar(t.preference_rate_a, t.preference_rate_b)}</td>
-      <td>${statusBadge(t.status || '計画中')}</td>
-      <td class="col-actions">
-        <button class="btn btn-sm btn-secondary" onclick="openTrialModal('${t.id}')">編集</button>
-        <button class="btn btn-sm btn-success" onclick="openPrepSheet('${t.id}')">調製</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteTrial('${t.id}')">削除</button>
-      </td>
-    </tr>`);
-
-  // 内訳行 (A/B を並べる)
-  for (let i = 0; i < maxRows; i++) {
-    const a = ings.A[i];
-    const b = ings.B[i];
-    rows.push(`
-      <tr class="trial-row-ingredient">
-        <td></td>
-        <td></td>
-        <td style="padding-left:28px">
-          ${a ? `<span class="side-badge side-a">○</span> ${escHtml(a.recipe_name || '')}${a.material_no ? ` <span style="font-size:10px;color:var(--gray-400)">(${escHtml(a.material_no)})</span>` : ''}` : ''}
-        </td>
-        <td style="text-align:right;font-size:12px">
-          ${a ? `${a.blend_rate != null ? fmtNum(a.blend_rate,1)+'%' : ''} / ${a.weight_g != null ? fmtNum(a.weight_g,0)+'g' : ''}` : ''}
-        </td>
-        <td style="padding-left:28px">
-          ${b ? `<span class="side-badge side-b">●</span> ${escHtml(b.recipe_name || '')}${b.material_no ? ` <span style="font-size:10px;color:var(--gray-400)">(${escHtml(b.material_no)})</span>` : ''}` : ''}
-        </td>
-        <td style="text-align:right;font-size:12px">
-          ${b ? `${b.blend_rate != null ? fmtNum(b.blend_rate,1)+'%' : ''} / ${b.weight_g != null ? fmtNum(b.weight_g,0)+'g' : ''}` : ''}
-        </td>
-        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-      </tr>`);
-  }
-
-  return rows.join('');
+    </tr>`;
 }
 
-// ── ソートボタン ─────────────────────────────────────────
+// ── ソート ────────────────────────────────────────────────
 function sortBtn(key, label) {
   const active = _trialSortKey === key;
   const arrow  = active ? (_trialSortAsc ? ' ↑' : ' ↓') : '';
@@ -156,21 +146,26 @@ function sortBtn(key, label) {
 async function sortTrials(key) {
   if (_trialSortKey === key) _trialSortAsc = !_trialSortAsc;
   else { _trialSortKey = key; _trialSortAsc = true; }
-  await renderTrialPlan(_trialSpecies, _trialLocation);
+  await _renderTrialTab();
 }
 
 // ── 試験モーダル ─────────────────────────────────────────
 function renderTrialModal() {
+  const tabs = TRIAL_TABS[_trialSpecies] || [];
+  const locOptions = tabs.map(t =>
+    `<option value="${escHtml(t.location)}" ${t.location===_trialLocation?'selected':''}>${escHtml(t.label)}</option>`
+  ).join('');
+
   return `
   <div class="modal-overlay" id="trialModal">
     <div class="modal-box modal-xl">
       <div class="modal-header">
         <span class="modal-title" id="trialModalTitle">試験を登録</span>
-        <button class="modal-close" onclick="closeModal('trialModal')">✕</button>
+        <button class="modal-close" onclick="closeModal('trialModal')">x</button>
       </div>
       <div class="modal-body">
         <!-- 基本情報 -->
-        <div class="form-grid form-grid-3" style="margin-bottom:16px">
+        <div class="form-grid form-grid-3" style="margin-bottom:14px">
           <div class="form-group">
             <label>試験日（表示用）<span style="color:red">*</span></label>
             <input class="form-control" id="t-date-label" placeholder="例: 20240528-29">
@@ -184,10 +179,22 @@ function renderTrialModal() {
             <input type="date" class="form-control" id="t-date-end">
           </div>
           <div class="form-group">
+            <label>試験場所</label>
+            <div style="display:flex;gap:6px">
+              <select class="form-control" id="t-location" style="flex:1">${locOptions}</select>
+            </div>
+          </div>
+          <div class="form-group">
             <label>種別<span style="color:red">*</span></label>
             <select class="form-control" id="t-food-type">
               <option value="dry">ドライ</option>
               <option value="wet">ウェット</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ステータス</label>
+            <select class="form-control" id="t-status">
+              <option>計画中</option><option>進行中</option><option>完了</option><option>中止</option>
             </select>
           </div>
           <div class="form-group">
@@ -208,36 +215,48 @@ function renderTrialModal() {
             <label>試験頭数</label>
             <input type="number" class="form-control" id="t-animal-count" min="1">
           </div>
-          <div class="form-group">
-            <label>ステータス</label>
-            <select class="form-control" id="t-status">
-              <option>計画中</option><option>進行中</option><option>完了</option><option>中止</option>
-            </select>
-          </div>
         </div>
-        <div class="form-group" style="margin-bottom:16px">
+        <div class="form-group" style="margin-bottom:14px">
           <label>備考</label>
           <textarea class="form-control" id="t-notes" rows="2"></textarea>
         </div>
 
-        <!-- 内訳エディタ -->
+        <!-- 内訳エディタ (A/B 並列) -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          ${['A','B'].map(side => `
           <div>
-            <div style="font-weight:700;margin-bottom:8px">
-              <span class="side-badge side-a">○</span> フード A の内訳
-              <span id="t-a-total" style="font-size:11px;color:var(--gray-400);margin-left:8px"></span>
+            <div style="font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+              <span class="side-badge side-${side.toLowerCase()}">${side==='A'?'○':'●'}</span>
+              フード ${side}
             </div>
-            <div class="ingredient-editor" id="ing-editor-A"></div>
-            <button class="btn-add-row" onclick="addIngredientRow('A')">＋ 行を追加</button>
-          </div>
-          <div>
-            <div style="font-weight:700;margin-bottom:8px">
-              <span class="side-badge side-b">●</span> フード B の内訳
-              <span id="t-b-total" style="font-size:11px;color:var(--gray-400);margin-left:8px"></span>
+            <div class="form-group" style="margin-bottom:8px">
+              <label>調製総重量 (g)</label>
+              <input type="number" class="form-control" id="t-total-weight-${side}" min="0" step="1"
+                placeholder="例: 4000"
+                oninput="onTotalWeightChange('${side}')">
             </div>
-            <div class="ingredient-editor" id="ing-editor-B"></div>
-            <button class="btn-add-row" onclick="addIngredientRow('B')">＋ 行を追加</button>
-          </div>
+            <!-- 合計表示行 -->
+            <div id="ing-sum-${side}" style="display:flex;gap:16px;font-size:12px;color:var(--gray-500);
+              background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;
+              padding:6px 10px;margin-bottom:6px">
+              配合率合計: <b id="ing-sum-rate-${side}">0.0</b>%
+              重量合計: <b id="ing-sum-weight-${side}">0</b> g
+            </div>
+            <!-- 内訳テーブル -->
+            <table class="data-table" style="font-size:12px" id="ing-table-${side}">
+              <thead>
+                <tr>
+                  <th style="width:90px">原料No.</th>
+                  <th>原料名</th>
+                  <th style="width:80px">配合率(%)</th>
+                  <th style="width:80px">重量(g)</th>
+                  <th style="width:30px"></th>
+                </tr>
+              </thead>
+              <tbody id="ing-tbody-${side}"></tbody>
+            </table>
+            <button class="btn-add-row" style="margin-top:6px" onclick="addIngredientRow('${side}')">+ 行を追加</button>
+          </div>`).join('')}
         </div>
       </div>
       <div class="modal-footer">
@@ -254,7 +273,7 @@ function renderIngredientSearchModal() {
     <div class="modal-box">
       <div class="modal-header">
         <span class="modal-title">原料を検索</span>
-        <button class="modal-close" onclick="closeModal('ingSearchModal')">✕</button>
+        <button class="modal-close" onclick="closeModal('ingSearchModal')">x</button>
       </div>
       <div class="modal-body">
         <input class="form-control" id="ingSearchInput" placeholder="原料No. または原料名で検索" oninput="filterIngSearch()">
@@ -264,52 +283,63 @@ function renderIngredientSearchModal() {
   </div>`;
 }
 
-// ── モーダル開閉 / データ読み込み ─────────────────────────
-let _ingSearchCallback = null;
-
+// ── モーダル開閉 ─────────────────────────────────────────
 async function openTrialModal(id = null) {
   _editTrialId = id;
+
+  // DOM 生成（setContent 後にある想定のため確認）
+  const existing = document.getElementById('trialModal');
+  if (!existing) {
+    const wrap = document.getElementById('modal-container');
+    wrap.innerHTML = renderTrialModal() + renderIngredientSearchModal();
+  }
+
   document.getElementById('trialModalTitle').textContent = id ? '試験を編集' : '試験を登録';
 
-  // 選択肢を datalist にセット
-  await fillDatalistFromDropdown('supplier-list', 'サプライヤー');
-  await fillDatalistFromDropdown('purpose-list', '試験区分');
+  await Promise.all([
+    fillDatalistFromDropdown('supplier-list', 'サプライヤー'),
+    fillDatalistFromDropdown('purpose-list', '試験区分'),
+  ]);
 
   _ingredientEditors = { A: [], B: [] };
+  _trialTotalWeight  = { A: 0, B: 0 };
 
   if (id) {
-    // 既存データ読み込み
     const [trials, ings] = await Promise.all([
       dbSelect('pal_trials', { eq: { id } }),
-      dbSelect('pal_trial_ingredients', { eq: { trial_id: id }, order: { col: 'sort_order', asc: true } })
+      dbSelect('pal_trial_ingredients', { eq: { trial_id: id }, order: { col: 'sort_order', asc: true } }),
     ]);
     const t = trials[0];
     if (!t) return;
 
-    document.getElementById('t-date-label').value    = t.trial_date_label || '';
-    document.getElementById('t-date-start').value    = t.trial_date_start || '';
-    document.getElementById('t-date-end').value      = t.trial_date_end   || '';
-    document.getElementById('t-food-type').value     = t.food_type        || 'dry';
-    document.getElementById('t-person').value        = t.person_in_charge || '';
-    document.getElementById('t-supplier').value      = t.supplier         || '';
-    document.getElementById('t-purpose').value       = t.purpose          || '';
-    document.getElementById('t-notes').value         = t.notes            || '';
-    document.getElementById('t-animal-count').value  = t.animal_count     || '';
-    document.getElementById('t-status').value        = t.status           || '計画中';
+    document.getElementById('t-date-label').value         = t.trial_date_label    || '';
+    document.getElementById('t-date-start').value         = t.trial_date_start    || '';
+    document.getElementById('t-date-end').value           = t.trial_date_end      || '';
+    document.getElementById('t-location').value           = t.location            ?? _trialLocation;
+    document.getElementById('t-food-type').value          = t.food_type           || 'dry';
+    document.getElementById('t-person').value             = t.person_in_charge    || '';
+    document.getElementById('t-supplier').value           = t.supplier            || '';
+    document.getElementById('t-purpose').value            = t.purpose             || '';
+    document.getElementById('t-notes').value              = t.notes               || '';
+    document.getElementById('t-animal-count').value       = t.animal_count        || '';
+    document.getElementById('t-status').value             = t.status              || '計画中';
+    document.getElementById('t-total-weight-A').value     = t.food_a_weight_total_g || '';
+    document.getElementById('t-total-weight-B').value     = t.food_b_weight_total_g || '';
+    _trialTotalWeight.A = Number(t.food_a_weight_total_g) || 0;
+    _trialTotalWeight.B = Number(t.food_b_weight_total_g) || 0;
 
-    _ingredientEditors.A = ings.filter(i => i.side === 'A').map(i => ({ ...i }));
-    _ingredientEditors.B = ings.filter(i => i.side === 'B').map(i => ({ ...i }));
+    _ingredientEditors.A = ings.filter(i => i.side === 'A').map(i => ({ ...i, _id: i.id || randId() }));
+    _ingredientEditors.B = ings.filter(i => i.side === 'B').map(i => ({ ...i, _id: i.id || randId() }));
   } else {
-    document.getElementById('t-date-label').value    = '';
-    document.getElementById('t-date-start').value    = '';
-    document.getElementById('t-date-end').value      = '';
-    document.getElementById('t-food-type').value     = 'dry';
-    document.getElementById('t-person').value        = '';
-    document.getElementById('t-supplier').value      = '';
-    document.getElementById('t-purpose').value       = '';
-    document.getElementById('t-notes').value         = '';
-    document.getElementById('t-animal-count').value  = '';
-    document.getElementById('t-status').value        = '計画中';
+    ['t-date-label','t-date-start','t-date-end','t-person','t-supplier','t-purpose','t-notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('t-location').value       = _trialLocation;
+    document.getElementById('t-food-type').value      = 'dry';
+    document.getElementById('t-animal-count').value   = '';
+    document.getElementById('t-status').value         = '計画中';
+    document.getElementById('t-total-weight-A').value = '';
+    document.getElementById('t-total-weight-B').value = '';
     _ingredientEditors = { A: [newIngRow()], B: [newIngRow()] };
   }
 
@@ -317,98 +347,155 @@ async function openTrialModal(id = null) {
   openModal('trialModal');
 }
 
+function randId() { return Math.random().toString(36).slice(2); }
 function newIngRow() {
-  return { _id: Math.random().toString(36).slice(2), material_no: '', recipe_name: '', blend_rate: '', weight_g: '', sort_order: 0 };
+  return { _id: randId(), material_no: '', recipe_name: '', blend_rate: null, weight_g: null, sort_order: 0 };
 }
 
-// ── 内訳エディタ描画 ─────────────────────────────────────
+// ── 内訳テーブル描画 ─────────────────────────────────────
 function renderIngEditors() {
-  ['A','B'].forEach(side => {
-    const wrap = document.getElementById(`ing-editor-${side}`);
-    if (!wrap) return;
-    wrap.innerHTML = _ingredientEditors[side].map((row, idx) => `
-      <div class="ingredient-row" id="ing-row-${side}-${row._id || idx}">
-        <div style="display:flex;gap:4px">
-          <input class="table-input" style="width:70px" placeholder="原料No."
-            value="${escHtml(row.material_no || '')}"
-            oninput="updateIngField('${side}','${row._id || idx}','material_no',this.value)">
-          <button class="btn btn-xs btn-secondary" onclick="openIngSearch('${side}','${row._id || idx}')" title="検索">🔍</button>
+  ['A','B'].forEach(side => renderIngSide(side));
+}
+
+function renderIngSide(side) {
+  const tbody = document.getElementById(`ing-tbody-${side}`);
+  if (!tbody) return;
+  const rows = _ingredientEditors[side];
+
+  tbody.innerHTML = rows.map((row, idx) => {
+    const isFirst = idx === 0;
+    const rateVal  = isFirst ? '' : (row.blend_rate ?? '');
+    const rateAttr = isFirst ? 'readonly style="background:var(--gray-50);color:var(--gray-500)"' : '';
+    const wgAttr   = 'readonly style="background:var(--gray-50);color:var(--gray-500)"';
+
+    return `<tr id="ing-row-${side}-${row._id}">
+      <td>
+        <div style="display:flex;gap:3px">
+          <input class="table-input" style="width:70px" placeholder="No."
+            value="${escHtml(row.material_no||'')}"
+            oninput="updateIngField('${side}','${row._id}','material_no',this.value)">
+          <button class="btn btn-xs btn-secondary" onclick="openIngSearch('${side}','${row._id}')" title="検索">...</button>
         </div>
-        <input class="table-input" placeholder="レシピ名（手打ちも可）"
-          value="${escHtml(row.recipe_name || '')}"
-          oninput="updateIngField('${side}','${row._id || idx}','recipe_name',this.value)">
-        <input class="table-input" type="number" placeholder="配合%" step="0.1"
-          value="${row.blend_rate ?? ''}"
-          oninput="updateIngField('${side}','${row._id || idx}','blend_rate',parseFloat(this.value)||null);calcIngTotal('${side}')">
-        <input class="table-input" type="number" placeholder="重量g" step="1"
-          value="${row.weight_g ?? ''}"
-          oninput="updateIngField('${side}','${row._id || idx}','weight_g',parseFloat(this.value)||null);calcIngTotal('${side}')">
-        <button class="btn-remove-row" onclick="removeIngRow('${side}','${row._id || idx}')">✕</button>
-      </div>`).join('');
-    calcIngTotal(side);
+      </td>
+      <td>
+        <input class="table-input" placeholder="原料名"
+          value="${escHtml(row.recipe_name||'')}"
+          oninput="updateIngField('${side}','${row._id}','recipe_name',this.value)">
+      </td>
+      <td>
+        <input class="table-input" type="number" placeholder="%" step="0.01"
+          id="ing-rate-${side}-${row._id}"
+          value="${rateVal}" ${rateAttr}
+          oninput="onIngRateChange('${side}','${row._id}',this.value)">
+      </td>
+      <td>
+        <input class="table-input" type="number" placeholder="g" step="0.01"
+          id="ing-weight-${side}-${row._id}"
+          value="${row.weight_g ?? ''}" ${wgAttr}>
+      </td>
+      <td>
+        <button class="btn-remove-row" onclick="removeIngRow('${side}','${row._id}')">x</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  recalcIngAll(side);
+}
+
+function onTotalWeightChange(side) {
+  _trialTotalWeight[side] = parseFloat(document.getElementById(`t-total-weight-${side}`).value) || 0;
+  recalcIngAll(side);
+}
+
+function onIngRateChange(side, rid, val) {
+  updateIngField(side, rid, 'blend_rate', parseFloat(val) || null);
+  recalcIngAll(side);
+}
+
+function recalcIngAll(side) {
+  const rows   = _ingredientEditors[side];
+  const total  = _trialTotalWeight[side];
+
+  // 2行目以降の配合率合計
+  const sumOthers = rows.slice(1).reduce((s, r) => s + (Number(r.blend_rate) || 0), 0);
+  const firstRate = Math.max(0, 100 - sumOthers);
+
+  // 1行目の blend_rate を自動セット
+  if (rows.length > 0) {
+    rows[0].blend_rate = parseFloat(firstRate.toFixed(2));
+    const el = document.getElementById(`ing-rate-${side}-${rows[0]._id}`);
+    if (el) el.value = rows[0].blend_rate;
+  }
+
+  // 全行の重量を自動計算
+  let sumRate = 0, sumWeight = 0;
+  rows.forEach(row => {
+    const rate = Number(row.blend_rate) || 0;
+    const wg   = total > 0 ? (total * rate / 100) : null;
+    row.weight_g = wg != null ? parseFloat(wg.toFixed(2)) : null;
+    const wel = document.getElementById(`ing-weight-${side}-${row._id}`);
+    if (wel) wel.value = row.weight_g ?? '';
+    sumRate   += rate;
+    sumWeight += row.weight_g || 0;
   });
+
+  // 合計表示
+  const sumRateEl   = document.getElementById(`ing-sum-rate-${side}`);
+  const sumWeightEl = document.getElementById(`ing-sum-weight-${side}`);
+  if (sumRateEl)   sumRateEl.textContent   = sumRate.toFixed(2);
+  if (sumWeightEl) sumWeightEl.textContent = sumWeight.toFixed(1);
 }
 
 function addIngredientRow(side) {
   _ingredientEditors[side].push(newIngRow());
-  renderIngEditors();
+  renderIngSide(side);
 }
 
 function removeIngRow(side, rid) {
-  _ingredientEditors[side] = _ingredientEditors[side].filter(r => (r._id || '') !== rid);
-  renderIngEditors();
+  _ingredientEditors[side] = _ingredientEditors[side].filter(r => r._id !== rid);
+  renderIngSide(side);
 }
 
 function updateIngField(side, rid, field, val) {
-  const row = _ingredientEditors[side].find(r => (r._id || '') === rid);
+  const row = _ingredientEditors[side].find(r => r._id === rid);
   if (row) row[field] = val;
-}
-
-function calcIngTotal(side) {
-  const rows = _ingredientEditors[side];
-  const totalPct = rows.reduce((s, r) => s + (Number(r.blend_rate) || 0), 0);
-  const totalG   = rows.reduce((s, r) => s + (Number(r.weight_g)   || 0), 0);
-  const el = document.getElementById(`t-${side.toLowerCase()}-total`);
-  if (el) el.textContent = `合計: ${totalPct.toFixed(1)}% / ${totalG.toFixed(0)}g`;
 }
 
 // ── 原料検索 ─────────────────────────────────────────────
 let _ingSearchSide = null;
 let _ingSearchRid  = null;
-let _allMaterials  = [];
 
 async function openIngSearch(side, rid) {
   _ingSearchSide = side;
   _ingSearchRid  = rid;
-  _allMaterials  = await getMaterials();
+  const mats = await getMaterials();
+  window._ingSearchMaterials = mats;
   document.getElementById('ingSearchInput').value = '';
   filterIngSearch();
   openModal('ingSearchModal');
 }
 
 function filterIngSearch() {
-  const q = document.getElementById('ingSearchInput').value.toLowerCase();
-  const results = _allMaterials.filter(m =>
-    (m.material_no || '').toLowerCase().includes(q) ||
-    (m.name || '').toLowerCase().includes(q)
-  ).slice(0, 50);
+  const q    = (document.getElementById('ingSearchInput').value || '').toLowerCase();
+  const mats = (window._ingSearchMaterials || []).filter(m =>
+    (m.material_no||'').toLowerCase().includes(q) || (m.name||'').toLowerCase().includes(q)
+  ).slice(0, 60);
 
-  document.getElementById('ingSearchResults').innerHTML = results.length === 0
+  document.getElementById('ingSearchResults').innerHTML = mats.length === 0
     ? '<p style="color:var(--gray-400);font-size:13px;padding:12px">見つかりませんでした</p>'
-    : results.map(m => `
-        <div onclick="selectMaterial('${escHtml(m.material_no || '')}','${escHtml(m.name || '')}')"
+    : mats.map(m => `
+        <div onclick="selectMaterial('${escHtml(m.material_no||'')}','${escHtml(m.name||'')}')"
           style="padding:8px 10px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:13px;"
           onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-          <strong>${escHtml(m.material_no || '')}</strong>
-          <span style="margin-left:8px">${escHtml(m.name || '')}</span>
-          ${materialStatusBadge(m.status)}
+          <strong>${escHtml(m.material_no||'')}</strong>
+          <span style="margin-left:8px">${escHtml(m.name||'')}</span>
         </div>`).join('');
 }
 
 function selectMaterial(no, name) {
-  const row = _ingredientEditors[_ingSearchSide].find(r => (r._id || '') === _ingSearchRid);
+  const row = _ingredientEditors[_ingSearchSide].find(r => r._id === _ingSearchRid);
   if (row) { row.material_no = no; row.recipe_name = name; }
-  renderIngEditors();
+  renderIngSide(_ingSearchSide);
   closeModal('ingSearchModal');
 }
 
@@ -417,30 +504,30 @@ async function saveTrial() {
   const dateLabel = document.getElementById('t-date-label').value.trim();
   if (!dateLabel) { showToast('試験日（表示用）は必須です', 'error'); return; }
 
+  const location = document.getElementById('t-location').value;
+
   const allIngA = _ingredientEditors.A;
   const allIngB = _ingredientEditors.B;
-
-  // 概要行の自動計算
-  const overviewA = allIngA.find(r => r.recipe_name)?.recipe_name || '';
-  const overviewB = allIngB.find(r => r.recipe_name)?.recipe_name || '';
-  const totalGa   = allIngA.reduce((s,r) => s + (Number(r.weight_g) || 0), 0) || null;
-  const totalGb   = allIngB.reduce((s,r) => s + (Number(r.weight_g) || 0), 0) || null;
+  const overviewA = allIngA.find(r => r.recipe_name)?.recipe_name || null;
+  const overviewB = allIngB.find(r => r.recipe_name)?.recipe_name || null;
+  const totalGa   = parseFloat(document.getElementById('t-total-weight-A').value) || null;
+  const totalGb   = parseFloat(document.getElementById('t-total-weight-B').value) || null;
 
   const trialData = {
     species:               _trialSpecies,
-    location:              _trialLocation,
+    location,
     food_type:             document.getElementById('t-food-type').value,
     trial_date_label:      dateLabel,
     trial_date_start:      document.getElementById('t-date-start').value  || null,
     trial_date_end:        document.getElementById('t-date-end').value    || null,
-    person_in_charge:      document.getElementById('t-person').value.trim()   || null,
-    supplier:              document.getElementById('t-supplier').value.trim() || null,
-    purpose:               document.getElementById('t-purpose').value.trim()  || null,
-    notes:                 document.getElementById('t-notes').value.trim()    || null,
+    person_in_charge:      document.getElementById('t-person').value.trim()    || null,
+    supplier:              document.getElementById('t-supplier').value.trim()  || null,
+    purpose:               document.getElementById('t-purpose').value.trim()   || null,
+    notes:                 document.getElementById('t-notes').value.trim()     || null,
     animal_count:          parseInt(document.getElementById('t-animal-count').value) || null,
     status:                document.getElementById('t-status').value,
-    food_a_overview:       overviewA || null,
-    food_b_overview:       overviewB || null,
+    food_a_overview:       overviewA,
+    food_b_overview:       overviewB,
     food_a_weight_total_g: totalGa,
     food_b_weight_total_g: totalGb,
   };
@@ -450,14 +537,12 @@ async function saveTrial() {
     if (_editTrialId) {
       await dbUpdate('pal_trials', _editTrialId, trialData);
       trialId = _editTrialId;
-      // 内訳を一旦削除して再挿入
       await sb.from('pal_trial_ingredients').delete().eq('trial_id', trialId);
     } else {
       const res = await dbInsert('pal_trials', [trialData]);
       trialId = res[0].id;
     }
 
-    // 内訳行を保存
     const ingRows = [];
     ['A','B'].forEach(side => {
       _ingredientEditors[side].forEach((row, idx) => {
@@ -467,17 +552,20 @@ async function saveTrial() {
           side,
           material_no: row.material_no || null,
           recipe_name: row.recipe_name || null,
-          blend_rate:  row.blend_rate  || null,
-          weight_g:    row.weight_g    || null,
+          blend_rate:  row.blend_rate  ?? null,
+          weight_g:    row.weight_g    ?? null,
           sort_order:  idx,
         });
       });
     });
     if (ingRows.length > 0) await dbInsert('pal_trial_ingredients', ingRows);
 
+    // 場所が変わった場合はタブも更新
+    _trialLocation = location;
+
     showToast('保存しました', 'success');
     closeModal('trialModal');
-    await renderTrialPlan(_trialSpecies, _trialLocation);
+    await _renderTrialTab();
   } catch (e) {
     console.error(e);
     showToast('保存に失敗しました: ' + e.message, 'error');
@@ -486,19 +574,42 @@ async function saveTrial() {
 
 // ── 削除 ─────────────────────────────────────────────────
 async function deleteTrial(id) {
-  if (!confirm('この試験（内訳・結果を含む）を削除しますか？')) return;
+  if (!confirm('この試験を削除しますか？（内訳・結果を含む）')) return;
   try {
     await dbDelete('pal_trials', id);
     showToast('削除しました', 'success');
-    await renderTrialPlan(_trialSpecies, _trialLocation);
+    await _renderTrialTab();
   } catch (e) {
     showToast('削除に失敗しました: ' + e.message, 'error');
   }
 }
 
-// ── datalist 補完 ─────────────────────────────────────────
+// ── datalist ─────────────────────────────────────────────
 async function fillDatalistFromDropdown(listId, category) {
   const opts = await getDropdowns(category);
   const dl = document.getElementById(listId);
   if (dl) dl.innerHTML = opts.map(o => `<option value="${escHtml(o.value)}">`).join('');
+}
+
+// ── リサイズ可能テーブル ──────────────────────────────────
+function initResizableTable(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const cols = table.querySelectorAll('th');
+  cols.forEach(th => {
+    if (th.querySelector('.col-resizer')) return;
+    const resizer = document.createElement('div');
+    resizer.className = 'col-resizer';
+    th.appendChild(resizer);
+    let startX, startW;
+    resizer.addEventListener('mousedown', e => {
+      startX = e.pageX;
+      startW = th.offsetWidth;
+      const onMove = ev => { th.style.width = Math.max(40, startW + ev.pageX - startX) + 'px'; };
+      const onUp   = ()  => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    });
+  });
 }

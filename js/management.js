@@ -599,44 +599,146 @@ async function saveStatSettings(species) {
 }
 
 // ──────────────────────────────────────────────────────────
-// 結果一覧 表示列設定
+// ユーザー管理
 // ──────────────────────────────────────────────────────────
-let _colTab = 'cat';
+let _editUserId = null;
 
-async function renderResultColumns() {
-  setTitle('結果一覧 表示列設定');
+async function renderUserManagement() {
+  setTitle('ユーザー管理');
   loading();
-  const cols = await dbSelect('result_list_columns', { order: { col: 'sort_order', asc: true } });
-  const catCols = cols.filter(c => c.species === 'cat');
-  const dogCols = cols.filter(c => c.species === 'dog');
+
+  let users = [];
+  try {
+    users = await callDb({ action: 'list-users' });
+  } catch (e) {
+    setContent(`<div class="empty-state"><p>ユーザー一覧の取得に失敗しました: ${escHtml(e.message)}</p></div>`);
+    return;
+  }
 
   setContent(`
-    <div class="tab-bar">
-      <button class="tab-btn${_colTab==='cat'?' active':''}" onclick="_colTab='cat';renderResultColumns()">🐱 猫</button>
-      <button class="tab-btn${_colTab==='dog'?' active':''}" onclick="_colTab='dog';renderResultColumns()">🐶 犬</button>
+    <div style="margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <span style="flex:1;font-size:13px;color:var(--gray-500)">${users.length} ユーザー</span>
+      <button class="btn btn-primary btn-sm" onclick="openUserModal()">＋ ユーザーを招待</button>
     </div>
     <div class="card">
-      <div class="card-header">
-        <span class="card-title">${_colTab==='cat'?'猫':'犬'} 結果一覧の表示列</span>
-        <span style="font-size:12px;color:var(--gray-400)">チェックを入れた列を結果一覧に表示します</span>
-      </div>
-      <div class="col-toggle-grid">
-        ${(_colTab==='cat'?catCols:dogCols).map(c => `
-          <label class="col-toggle-item">
-            <input type="checkbox" ${c.visible?'checked':''} onchange="toggleResultColumn('${c.id}',this.checked)">
-            <span style="font-size:13px">${escHtml(c.label)}</span>
-            <span style="font-size:10px;color:var(--gray-400);margin-left:4px">${c.sort_order}</span>
-          </label>`).join('')}
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>メールアドレス</th>
+              <th>表示名</th>
+              <th>役割</th>
+              <th>最終ログイン</th>
+              <th>登録日</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(u => `
+              <tr>
+                <td style="font-size:12px">${escHtml(u.email)}</td>
+                <td>${escHtml(u.display_name || '')}</td>
+                <td><span class="status-badge ${u.role === 'admin' ? 'status-進行中' : 'status-計画中'}">${u.role === 'admin' ? '管理者' : '一般'}</span></td>
+                <td style="font-size:12px">${u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '-'}</td>
+                <td style="font-size:12px">${formatDate(u.created_at)}</td>
+                <td class="col-actions">
+                  <button class="btn btn-xs btn-secondary" onclick="openUserModal('${u.id}','${escHtml(u.email)}','${escHtml(u.display_name || '')}','${u.role}')">編集</button>
+                  <button class="btn btn-xs btn-danger" onclick="deleteUser('${u.id}')">削除</button>
+                </td>
+              </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--gray-400);padding:32px">ユーザーがいません</td></tr>'}
+          </tbody>
+        </table>
       </div>
     </div>
-    <div style="text-align:right;margin-top:8px">
-      <button class="btn btn-secondary" onclick="renderResultList('${_colTab}')">結果一覧へ戻る</button>
-    </div>
+    ${renderUserModal()}
   `);
 }
 
-async function toggleResultColumn(id, visible) {
+function renderUserModal() {
+  return `
+  <div class="modal-overlay" id="userModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title" id="userModalTitle">ユーザーを招待</span>
+        <button class="modal-close" onclick="closeModal('userModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group" id="userEmailGroup">
+            <label>メールアドレス<span style="color:red">*</span></label>
+            <input class="form-control" id="u-email" type="email" placeholder="email@example.com">
+          </div>
+          <div class="form-group">
+            <label>表示名</label>
+            <input class="form-control" id="u-name" placeholder="氏名">
+          </div>
+          <div class="form-group">
+            <label>役割</label>
+            <select class="form-control" id="u-role">
+              <option value="general">一般</option>
+              <option value="admin">管理者</option>
+            </select>
+          </div>
+          <div class="form-group" id="userPwGroup" style="display:none">
+            <label>新しいパスワード（変更する場合のみ）</label>
+            <input class="form-control" id="u-pw" type="password" placeholder="8文字以上">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('userModal')">キャンセル</button>
+        <button class="btn btn-primary" id="userSaveBtn" onclick="saveUser()">招待メールを送信</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function openUserModal(id = null, email = '', name = '', role = 'general') {
+  _editUserId = id;
+  const isEdit = !!id;
+  document.getElementById('userModalTitle').textContent = isEdit ? 'ユーザーを編集' : 'ユーザーを招待';
+  document.getElementById('u-email').value = email;
+  document.getElementById('u-name').value = name;
+  document.getElementById('u-role').value = role;
+  document.getElementById('u-pw').value = '';
+  document.getElementById('userEmailGroup').style.display = isEdit ? 'none' : '';
+  document.getElementById('userPwGroup').style.display = isEdit ? '' : 'none';
+  document.getElementById('userSaveBtn').textContent = isEdit ? '保存' : '招待メールを送信';
+  openModal('userModal');
+}
+
+async function saveUser() {
+  const name = document.getElementById('u-name').value.trim();
+  const role = document.getElementById('u-role').value;
   try {
-    await dbUpdate('result_list_columns', id, { visible });
-  } catch (e) { showToast('更新に失敗: ' + e.message, 'error'); }
+    if (_editUserId) {
+      const pw = document.getElementById('u-pw').value;
+      await callDb({
+        action: 'update-user',
+        id: _editUserId,
+        data: { display_name: name, app_role: role, ...(pw ? { password: pw } : {}) },
+      });
+      showToast('更新しました', 'success');
+    } else {
+      const email = document.getElementById('u-email').value.trim();
+      if (!email) { showToast('メールアドレスは必須です', 'error'); return; }
+      await callDb({ action: 'invite-user', data: { email, display_name: name, app_role: role } });
+      showToast('招待メールを送信しました', 'success');
+    }
+    closeModal('userModal');
+    await renderUserManagement();
+  } catch (e) {
+    showToast('処理に失敗しました: ' + e.message, 'error');
+  }
+}
+
+async function deleteUser(id) {
+  if (!confirm('このユーザーを削除しますか？この操作は取り消せません。')) return;
+  try {
+    await callDb({ action: 'delete-user', id });
+    showToast('削除しました', 'success');
+    await renderUserManagement();
+  } catch (e) {
+    showToast('削除に失敗: ' + e.message, 'error');
+  }
 }
