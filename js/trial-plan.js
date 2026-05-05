@@ -2,13 +2,14 @@
 // 試験計画セクション
 // ============================================================
 
-let _trialSortKey  = 'trial_date_start';
-let _trialSortAsc  = false;
-let _trialSpecies  = 'cat';
-let _trialLocation = 'R';          // 現在表示中のタブ
-let _editTrialId   = null;
-let _trialsList    = [];
-let _ingredientEditors = {};       // { A: [...], B: [...] }
+let _trialSortKey     = 'trial_date_start';
+let _trialSortAsc     = false;
+let _trialSpecies     = 'cat';
+let _trialLocation    = 'R';          // 現在表示中のタブ
+let _editTrialId      = null;
+let _trialsList       = [];
+let _trialFilterState = {};           // フィルタ状態
+let _ingredientEditors = {};          // { A: [...], B: [...] }
 let _trialTotalWeight  = { A: 0, B: 0 }; // 調製総重量
 
 // 猫/犬それぞれのタブ定義
@@ -45,14 +46,43 @@ async function _renderTrialTab() {
   const location = _trialLocation;
   const tabs     = TRIAL_TABS[species] || [];
 
-  const [trials, locations] = await Promise.all([
+  const [allTrials, locations] = await Promise.all([
     dbSelect('pal_trials', {
       eq:    { species, location },
-      order: { col: _trialSortKey, asc: _trialSortAsc }
+      order: { col: 'trial_date_start', asc: false }
     }),
     getDropdowns('場所_' + species),
   ]);
+
+  // フィルタを適用
+  let trials = [...allTrials];
+  const dateFrom = _trialFilterState.dateFrom || '';
+  const dateTo   = _trialFilterState.dateTo || '';
+  const keyword  = (_trialFilterState.keyword || '').toLowerCase();
+  const statuses = _trialFilterState.statuses || [];
+  const foodTypes = _trialFilterState.foodTypes || [];
+
+  trials = trials.filter(t => {
+    if (dateFrom && (t.trial_date_start||'') < dateFrom) return false;
+    if (dateTo   && (t.trial_date_start||'') > dateTo)   return false;
+    if (keyword  && !`${t.purpose||''} ${t.food_a_overview||''} ${t.food_b_overview||''} ${t.notes||''}`.toLowerCase().includes(keyword)) return false;
+    if (statuses.length && !statuses.includes(t.status||'計画中')) return false;
+    if (foodTypes.length && !foodTypes.includes(t.food_type)) return false;
+    return true;
+  });
+
+  // ソート
+  trials = trials.sort((a, b) => {
+    const av = (a[_trialSortKey]||'').toString();
+    const bv = (b[_trialSortKey]||'').toString();
+    return _trialSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+
   _trialsList = trials;
+
+  // フィルタ値の収集
+  const statusOpts   = [...new Set(allTrials.map(t=>t.status||'計画中'))].sort();
+  const foodTypeOpts = [...new Set(allTrials.map(t=>t.food_type).filter(Boolean))].sort();
 
   const tabBar = `
     <div class="tab-bar" style="margin-bottom:0">
@@ -69,8 +99,57 @@ async function _renderTrialTab() {
       ${sortBtn('purpose','目的')}
       ${sortBtn('notes','備考')}
       ${sortBtn('supplier','サプライヤー')}
+      <button class="btn btn-secondary btn-xs" onclick="toggleTrialFilter()" style="margin-left:12px">フィルタ</button>
       <div style="flex:1"></div>
       <button class="btn btn-primary btn-sm" onclick="openTrialModal()">+ 新規試験登録</button>
+    </div>
+
+    <div class="card" id="trialFilterPanel" style="display:none;margin-top:12px">
+      <div class="card-body" style="padding:12px">
+        <div class="form-grid form-grid-3" style="gap:10px;margin-bottom:10px">
+          <div class="form-group">
+            <label style="font-size:11px">試験日（開始）</label>
+            <input type="date" class="form-control" id="f-trial-date-from" value="${_trialFilterState.dateFrom||''}" onchange="applyTrialFilter()">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">試験日（終了）</label>
+            <input type="date" class="form-control" id="f-trial-date-to" value="${_trialFilterState.dateTo||''}" onchange="applyTrialFilter()">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">キーワード（目的・レシピ等）</label>
+            <input class="form-control" id="f-trial-keyword" placeholder="検索..." value="${escHtml(_trialFilterState.keyword||'')}" oninput="applyTrialFilter()">
+          </div>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:4px">状態</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${statusOpts.map(s => `
+                <label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer">
+                  <input type="checkbox" value="${escHtml(s)}" class="f-trial-status"
+                    ${(_trialFilterState.statuses||[]).includes(s)?'checked':''}
+                    onchange="applyTrialFilter()">
+                  ${escHtml(s)}
+                </label>`).join('')}
+            </div>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:4px">種別</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${foodTypeOpts.map(ft => `
+                <label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer">
+                  <input type="checkbox" value="${escHtml(ft)}" class="f-trial-foodtype"
+                    ${(_trialFilterState.foodTypes||[]).includes(ft)?'checked':''}
+                    onchange="applyTrialFilter()">
+                  ${foodTypeLabel(ft)}
+                </label>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn btn-secondary btn-xs" onclick="clearTrialFilter()">フィルタをリセット</button>
+        </div>
+      </div>
     </div>`;
 
   const tableHtml = `
@@ -81,20 +160,20 @@ async function _renderTrialTab() {
       </div>
       <div class="table-wrap" id="trialTableWrap">
         <table class="data-table resizable-table" id="trialTable">
-          <thead>
+          <thead style="position:sticky;top:0;z-index:10;background:#fff;border-bottom:2px solid var(--gray-200)">
             <tr>
-              <th data-col="date">試験日</th>
+              <th data-col="date" style="width:120px">試験日</th>
               <th data-col="actions" style="width:130px"></th>
               <th data-col="status">状態</th>
               <th data-col="food_type">種別</th>
-              <th data-col="food_a">○ レシピ</th>
-              <th data-col="food_b">● レシピ</th>
+              <th data-col="food_a">フードA</th>
+              <th data-col="food_b">フードB</th>
               <th data-col="person">担当者</th>
               <th data-col="purpose">目的</th>
               <th data-col="notes">備考</th>
               <th data-col="supplier">サプライヤー</th>
               <th data-col="count">頭数</th>
-              <th data-col="pref">選択率</th>
+              <th data-col="pref">採食比</th>
             </tr>
           </thead>
           <tbody>
@@ -592,6 +671,34 @@ async function fillDatalistFromDropdown(listId, category) {
 }
 
 // ── リサイズ可能テーブル ──────────────────────────────────
+// ── 試験計画フィルタ ─────────────────────────────────────
+function toggleTrialFilter() {
+  const p = document.getElementById('trialFilterPanel');
+  if (!p) return;
+  const open = p.style.display !== 'none';
+  p.style.display = open ? 'none' : 'block';
+}
+
+function applyTrialFilter() {
+  const dateFrom  = document.getElementById('f-trial-date-from')?.value || '';
+  const dateTo    = document.getElementById('f-trial-date-to')?.value   || '';
+  const keyword   = (document.getElementById('f-trial-keyword')?.value   || '').toLowerCase();
+  const statuses  = [...document.querySelectorAll('.f-trial-status:checked')].map(el => el.value);
+  const foodTypes = [...document.querySelectorAll('.f-trial-foodtype:checked')].map(el => el.value);
+
+  _trialFilterState = { dateFrom, dateTo, keyword, statuses, foodTypes };
+  _renderTrialTab();
+}
+
+function clearTrialFilter() {
+  _trialFilterState = {};
+  document.querySelectorAll('.f-trial-status,.f-trial-foodtype').forEach(el => { el.checked = false; });
+  const kw = document.getElementById('f-trial-keyword'); if (kw) kw.value = '';
+  const df = document.getElementById('f-trial-date-from'); if (df) df.value = '';
+  const dt = document.getElementById('f-trial-date-to');   if (dt) dt.value = '';
+  applyTrialFilter();
+}
+
 function initResizableTable(tableId) {
   const table = document.getElementById(tableId);
   if (!table) return;

@@ -268,7 +268,8 @@ async function renderDropdowns() {
   loading();
   cacheDropdowns = null;
   const all = await dbSelect('dropdown_options', { order: { col: 'sort_order', asc: true } });
-  const cats = [...new Set(all.map(d => d.category))];
+  let cats = [...new Set(all.map(d => d.category))];
+
   if (!_ddCurrentCat && cats.length > 0) _ddCurrentCat = cats[0];
 
   const filtered = all.filter(d => d.category === _ddCurrentCat);

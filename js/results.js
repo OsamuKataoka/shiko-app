@@ -154,11 +154,11 @@ async function renderResultList(species) {
       </div>
       <div class="table-wrap">
         <table class="data-table resizable-table" id="resTable">
-          <thead>
+          <thead style="position:sticky;top:0;z-index:10;background:#fff;border-bottom:2px solid var(--gray-200)">
             <tr>
-              <th>試験日</th>
-              <th style="width:80px"></th>
-              ${visibleCols.map(c => `<th>${escHtml(c.label)}</th>`).join('')}
+              <th style="width:130px">試験日</th>
+              <th style="width:120px"></th>
+              ${visibleCols.filter(c => c.column_key !== 'trial_date_label').map(c => `<th>${escHtml(c.label)}</th>`).join('')}
             </tr>
           </thead>
           <tbody id="resTbody">
@@ -274,8 +274,8 @@ function renderResultCell(key, trial, analysis) {
     case 'notes':              return `<span style="font-size:11px">${escHtml(trial.notes || '')}</span>`;
     case 'supplier':           return escHtml(trial.supplier || '');
     case 'person_in_charge':   return escHtml(trial.person_in_charge || '');
-    case 'food_a_overview':    return `<span style="color:#1d4ed8">○</span> ${escHtml(trial.food_a_overview||'')}`;
-    case 'food_b_overview':    return `<span style="color:#b45309">●</span> ${escHtml(trial.food_b_overview||'')}`;
+    case 'food_a_overview':    return `<span style="color:#1d4ed8;font-weight:600">フードA:</span> ${escHtml(trial.food_a_overview||'')}`;
+    case 'food_b_overview':    return `<span style="color:#b45309;font-weight:600">フードB:</span> ${escHtml(trial.food_b_overview||'')}`;
     case 'status':             return statusBadge(trial.status || '計画中');
     case 'n_total':            return analysis.n_total ?? '-';
     case 'n_excluded':         return analysis.n_excluded ?? '-';
@@ -295,7 +295,7 @@ function renderResultCell(key, trial, analysis) {
     case 'effect_size_label':  return escHtml(analysis.effect_size_label || '-');
     case 'winner': {
       if (!analysis.winner) return '-';
-      const m = { A:'<span style="color:#1d4ed8;font-weight:700">○ 勝</span>', B:'<span style="color:#b45309;font-weight:700">● 勝</span>', tie:'引き分け', inconclusive:'判定不能' };
+      const m = { A:'<span style="color:#1d4ed8;font-weight:700">フードA勝</span>', B:'<span style="color:#b45309;font-weight:700">フードB勝</span>', tie:'引き分け', inconclusive:'判定不能' };
       return m[analysis.winner] || escHtml(analysis.winner);
     }
     default: return '';
@@ -529,12 +529,12 @@ async function openResultDetail(trialId) {
       <div class="stat-winner">${winnerLabel[a.winner] || a.winner || '-'}</div>
       <div class="pref-display">
         <div class="pref-block side-a">
-          <div class="pref-label">○ フードA 平均採食比</div>
+          <div class="pref-label">フードA 平均採食比</div>
           <div class="pref-value">${fmtPct(a.mean_a_ratio_avg)}</div>
           <div class="pref-label">中央値: ${fmtPct(a.median_a_ratio_avg)}</div>
         </div>
         <div class="pref-block side-b">
-          <div class="pref-label">● フードB 平均採食比</div>
+          <div class="pref-label">フードB 平均採食比</div>
           <div class="pref-value">${fmtPct(a.mean_b_ratio_avg)}</div>
           <div class="pref-label">中央値: ${fmtPct(a.median_b_ratio_avg)}</div>
         </div>

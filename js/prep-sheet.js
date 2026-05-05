@@ -135,12 +135,56 @@ function renderChecklistItems(checklist, foodType, species, location) {
     return matchSp && matchLoc && matchFt;
   }).sort((a,b) => a.sort_order - b.sort_order);
 
-  return items.map(c => `
-    <div class="check-item">
-      <div class="check-box"></div>
-      <span>${escHtml(c.item_text)}</span>
-      <input class="table-input no-print" style="width:80px;margin-left:auto" placeholder="確認(✓)">
-    </div>`).join('') || '<div style="color:var(--gray-400);font-size:12px">チェック項目がありません（管理 > 調製用紙チェックで設定）</div>';
+  return items.map((c, idx) => `
+    <div class="check-item" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee">
+      <div class="check-box" style="width:16px;height:16px;border:1.5px solid #666;border-radius:3px;flex-shrink:0"></div>
+      <span style="flex:1;font-size:12px">${escHtml(c.item_text)}</span>
+      <input class="table-input no-print" style="width:60px;font-size:11px" placeholder="✓" title="確認">
+      <input type="file" accept="image/*" class="no-print" style="width:80px;font-size:11px;cursor:pointer" title="画像を添付" onchange="handleChecklistImage(event, ${idx})">
+      <img id="check-img-${idx}" style="width:40px;height:40px;object-fit:contain;border-radius:4px;display:none;cursor:pointer" title="クリックで拡大" onclick="showChecklistImageModal(this.src)">
+    </div>`).join('') || '<div style="color:var(--gray-400);font-size:12px;padding:8px 0">チェック項目がありません（管理 > 調製用紙チェックで設定）</div>';
+}
+
+let _checklistImages = {}; // { idx: dataUrl }
+
+function handleChecklistImage(e, idx) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const dataUrl = ev.target.result;
+    _checklistImages[idx] = dataUrl;
+    const imgEl = document.getElementById(`check-img-${idx}`);
+    if (imgEl) {
+      imgEl.src = dataUrl;
+      imgEl.style.display = 'block';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function showChecklistImageModal(src) {
+  const modal = document.getElementById('checklistImageModal');
+  if (!modal) {
+    const m = document.createElement('div');
+    m.id = 'checklistImageModal';
+    m.className = 'modal-overlay';
+    m.innerHTML = `
+      <div class="modal-box" style="width:600px;max-width:90vw">
+        <div class="modal-header">
+          <span class="modal-title">画像表示</span>
+          <button class="modal-close" onclick="closeModal('checklistImageModal')">✕</button>
+        </div>
+        <div class="modal-body" style="text-align:center">
+          <img id="checklistImageView" src="${escHtml(src)}" style="max-width:100%;max-height:70vh;border-radius:6px">
+        </div>
+      </div>
+    `;
+    document.body.appendChild(m);
+  } else {
+    document.getElementById('checklistImageView').src = src;
+  }
+  openModal('checklistImageModal');
 }
 
 async function getChecklistItems() {
