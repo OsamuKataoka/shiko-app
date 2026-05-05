@@ -153,11 +153,11 @@ async function renderResultList(species) {
         </div>
       </div>
       <div class="table-wrap">
-        <table class="data-table resizable-table" id="resTable">
-          <thead style="position:sticky;top:0;z-index:10;background:#fff;border-bottom:2px solid var(--gray-200)">
+        <table class="data-table resizable-table table-with-sticky-cols" id="resTable">
+          <thead>
             <tr>
               <th style="width:130px">試験日</th>
-              <th style="width:120px"></th>
+              <th style="width:160px;text-align:center">結果入力</th>
               ${visibleCols.filter(c => c.column_key !== 'trial_date_label').map(c => `<th>${escHtml(c.label)}</th>`).join('')}
             </tr>
           </thead>
@@ -183,9 +183,9 @@ function buildResRows(trials, analysisMap, visibleCols) {
     const a = (analysisMap || {})[t.id] || {};
     return `<tr>
       <td style="white-space:nowrap;font-weight:600">${escHtml(t.trial_date_label || formatDate(t.trial_date_start))}</td>
-      <td class="col-actions" style="white-space:nowrap">
-        <button class="btn btn-xs btn-secondary" onclick="openResultEdit('${t.id}')">結果入力</button>
-        ${a.id ? `<button class="btn btn-xs btn-success" onclick="openResultDetail('${t.id}')">詳細</button>` : ''}
+      <td class="col-actions" style="white-space:nowrap;text-align:center">
+        <button class="btn btn-xs btn-secondary" title="結果入力" onclick="openResultEdit('${t.id}')">✎</button>
+        ${a.id ? `<button class="btn btn-xs btn-success" title="詳細表示" onclick="openResultDetail('${t.id}')">◆</button>` : ''}
       </td>
       ${visibleCols.map(c => `<td>${renderResultCell(c.column_key, t, a)}</td>`).join('')}
     </tr>`;

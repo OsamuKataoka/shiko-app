@@ -2,14 +2,17 @@
 // 試験計画セクション
 // ============================================================
 
-let _trialSortKey     = 'trial_date_start';
-let _trialSortAsc     = false;
-let _trialSpecies     = 'cat';
-let _trialLocation    = 'R';          // 現在表示中のタブ
-let _editTrialId      = null;
-let _trialsList       = [];
-let _trialFilterState = {};           // フィルタ状態
-let _ingredientEditors = {};          // { A: [...], B: [...] }
+let _trialSortKey      = 'trial_date_start';
+let _trialSortAsc      = false;
+let _trialSpecies      = 'cat';
+let _trialLocation     = 'R';          // 現在表示中のタブ
+let _editTrialId       = null;
+let _trialsList        = [];
+let _trialFilterState  = {};           // フィルタ状態
+let _trialShowFilter   = false;        // フィルタパネル表示状態
+let _trialShowColSel   = false;        // 列設定パネル表示状態
+let _trialVisibleCols  = ['status','food_type','food_a','food_b','person','purpose'];  // デフォルト表示列
+let _ingredientEditors = {};           // { A: [...], B: [...] }
 let _trialTotalWeight  = { A: 0, B: 0 }; // 調製総重量
 
 // 猫/犬それぞれのタブ定義
@@ -92,65 +95,79 @@ async function _renderTrialTab() {
       `).join('')}
     </div>`;
 
-  const sortBar = `
-    <div class="sort-bar" style="margin-top:12px">
-      <label>ソート:</label>
-      ${sortBtn('trial_date_start','試験日')}
-      ${sortBtn('purpose','目的')}
-      ${sortBtn('notes','備考')}
-      ${sortBtn('supplier','サプライヤー')}
-      <button class="btn btn-secondary btn-xs" onclick="toggleTrialFilter()" style="margin-left:12px">フィルタ</button>
+  // コントロールバー：ボタンのみ表示（パネルは折りたたまれた状態）
+  const controlBar = `
+    <div class="panel-toggle-bar" style="margin-top:12px">
+      <button class="panel-toggle-btn${_trialShowFilter?' active':''}" onclick="toggleTrialFilter()">
+        フィルタ・ソート ${_trialShowFilter ? '▲' : '▼'}
+      </button>
+      <button class="panel-toggle-btn${_trialShowColSel?' active':''}" onclick="toggleTrialColSel()">
+        表示列設定 ${_trialShowColSel ? '▲' : '▼'}
+      </button>
       <div style="flex:1"></div>
       <button class="btn btn-primary btn-sm" onclick="openTrialModal()">+ 新規試験登録</button>
-    </div>
+    </div>`;
 
-    <div class="card" id="trialFilterPanel" style="display:none;margin-top:12px">
+  // フィルタ・ソートパネル
+  const filterPanel = `
+    <div id="trialFilterPanel" class="card" style="margin-top:12px;${_trialShowFilter?'':'display:none'}">
       <div class="card-body" style="padding:12px">
         <div class="form-grid form-grid-3" style="gap:10px;margin-bottom:10px">
           <div class="form-group">
-            <label style="font-size:11px">試験日（開始）</label>
+            <label style="font-size:11px;font-weight:600">試験日（開始）</label>
             <input type="date" class="form-control" id="f-trial-date-from" value="${_trialFilterState.dateFrom||''}" onchange="applyTrialFilter()">
           </div>
           <div class="form-group">
-            <label style="font-size:11px">試験日（終了）</label>
+            <label style="font-size:11px;font-weight:600">試験日（終了）</label>
             <input type="date" class="form-control" id="f-trial-date-to" value="${_trialFilterState.dateTo||''}" onchange="applyTrialFilter()">
           </div>
           <div class="form-group">
-            <label style="font-size:11px">キーワード（目的・レシピ等）</label>
-            <input class="form-control" id="f-trial-keyword" placeholder="検索..." value="${escHtml(_trialFilterState.keyword||'')}" oninput="applyTrialFilter()">
+            <label style="font-size:11px;font-weight:600">キーワード</label>
+            <input class="form-control" id="f-trial-keyword" placeholder="目的・レシピ等..." value="${escHtml(_trialFilterState.keyword||'')}" oninput="applyTrialFilter()">
           </div>
         </div>
-        <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px">
           <div>
             <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:4px">状態</label>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
-              ${statusOpts.map(s => `
-                <label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer">
-                  <input type="checkbox" value="${escHtml(s)}" class="f-trial-status"
-                    ${(_trialFilterState.statuses||[]).includes(s)?'checked':''}
-                    onchange="applyTrialFilter()">
-                  ${escHtml(s)}
-                </label>`).join('')}
+              ${statusOpts.map(s => `<label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer"><input type="checkbox" value="${escHtml(s)}" class="f-trial-status" ${(_trialFilterState.statuses||[]).includes(s)?'checked':''} onchange="applyTrialFilter()">${escHtml(s)}</label>`).join('')}
             </div>
           </div>
           <div>
             <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:4px">種別</label>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
-              ${foodTypeOpts.map(ft => `
-                <label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer">
-                  <input type="checkbox" value="${escHtml(ft)}" class="f-trial-foodtype"
-                    ${(_trialFilterState.foodTypes||[]).includes(ft)?'checked':''}
-                    onchange="applyTrialFilter()">
-                  ${foodTypeLabel(ft)}
-                </label>`).join('')}
+              ${foodTypeOpts.map(ft => `<label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer"><input type="checkbox" value="${escHtml(ft)}" class="f-trial-foodtype" ${(_trialFilterState.foodTypes||[]).includes(ft)?'checked':''} onchange="applyTrialFilter()">${foodTypeLabel(ft)}</label>`).join('')}
             </div>
           </div>
         </div>
-        <div style="margin-top:8px">
-          <button class="btn btn-secondary btn-xs" onclick="clearTrialFilter()">フィルタをリセット</button>
+        <div style="display:flex;gap:8px">
+          <label style="font-size:11px;font-weight:600">ソート:</label>
+          ${sortBtn('trial_date_start','試験日')}
+          ${sortBtn('purpose','目的')}
+          ${sortBtn('supplier','サプライヤー')}
+          <button class="btn btn-secondary btn-xs" onclick="clearTrialFilter()">リセット</button>
         </div>
       </div>
     </div>`;
+
+  // 表示列設定パネル
+  const allCols = ['status','food_type','food_a','food_b','person','purpose','notes','supplier','count'];
+  const colLabels = { status:'状態', food_type:'種別', food_a:'フードA', food_b:'フードB', person:'担当者', purpose:'目的', notes:'備考', supplier:'サプライヤー', count:'頭数' };
+  const colPanel = `
+    <div id="trialColSelPanel" class="card" style="margin-top:12px;${_trialShowColSel?'':'display:none'}">
+      <div class="card-body" style="padding:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:8px">テーブルに表示する列</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+          ${allCols.map(col => `
+            <label class="col-toggle-item" style="padding:6px 8px">
+              <input type="checkbox" ${_trialVisibleCols.includes(col)?'checked':''} onchange="toggleTrialCol('${col}',this.checked)">
+              ${colLabels[col]}
+            </label>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  const sortBar = controlBar + filterPanel + colPanel;
 
   const tableHtml = `
     <div class="card" style="margin-top:0">
@@ -159,27 +176,21 @@ async function _renderTrialTab() {
         <span style="font-size:12px;color:var(--gray-400)">${trials.length} 件</span>
       </div>
       <div class="table-wrap" id="trialTableWrap">
-        <table class="data-table resizable-table" id="trialTable">
-          <thead style="position:sticky;top:0;z-index:10;background:#fff;border-bottom:2px solid var(--gray-200)">
+        <table class="data-table resizable-table table-with-sticky-cols" id="trialTable">
+          <thead>
             <tr>
               <th data-col="date" style="width:120px">試験日</th>
-              <th data-col="actions" style="width:130px"></th>
-              <th data-col="status">状態</th>
-              <th data-col="food_type">種別</th>
-              <th data-col="food_a">フードA</th>
-              <th data-col="food_b">フードB</th>
-              <th data-col="person">担当者</th>
-              <th data-col="purpose">目的</th>
-              <th data-col="notes">備考</th>
-              <th data-col="supplier">サプライヤー</th>
-              <th data-col="count">頭数</th>
-              <th data-col="pref">採食比</th>
+              <th data-col="actions" style="width:130px;text-align:center">編集・調製・削除</th>
+              ${_trialVisibleCols.map(col => {
+                const labels = { status:'状態', food_type:'種別', food_a:'フードA', food_b:'フードB', person:'担当者', purpose:'目的', notes:'備考', supplier:'サプライヤー', count:'頭数' };
+                return `<th data-col="${col}">${labels[col]}</th>`;
+              }).join('')}
             </tr>
           </thead>
           <tbody>
             ${trials.length === 0
-              ? `<tr><td colspan="12" style="text-align:center;color:var(--gray-400);padding:32px">登録された試験はありません</td></tr>`
-              : trials.map(t => renderTrialRow(t)).join('')
+              ? `<tr><td colspan="${_trialVisibleCols.length + 2}" style="text-align:center;color:var(--gray-400);padding:32px">登録された試験はありません</td></tr>`
+              : trials.map(t => renderTrialRow(t, _trialVisibleCols)).join('')
             }
           </tbody>
         </table>
@@ -192,26 +203,29 @@ async function _renderTrialTab() {
   initResizableTable('trialTable');
 }
 
-// ── 試験行 HTML（内訳行なし）──────────────────────────────
-function renderTrialRow(t) {
+// ── 試験行（選択列のみ）──────────────────────────────────
+function renderTrialRow(t, visibleCols) {
+  const cellMap = {
+    status: () => statusBadge(t.status || '計画中'),
+    food_type: () => escHtml(foodTypeLabel(t.food_type)),
+    food_a: () => `<span style="color:#1d4ed8;font-weight:600">A:</span> ${escHtml(t.food_a_overview || '-')}`,
+    food_b: () => `<span style="color:#b45309;font-weight:600">B:</span> ${escHtml(t.food_b_overview || '-')}`,
+    person: () => escHtml(t.person_in_charge || ''),
+    purpose: () => escHtml(t.purpose || ''),
+    notes: () => `<span style="font-size:11px">${escHtml(t.notes || '')}</span>`,
+    supplier: () => escHtml(t.supplier || ''),
+    count: () => t.animal_count ?? '-',
+  };
+
   return `
     <tr class="trial-row-summary" data-trial-id="${t.id}">
       <td style="white-space:nowrap;font-weight:700">${escHtml(t.trial_date_label || formatDate(t.trial_date_start))}</td>
-      <td class="col-actions" style="white-space:nowrap">
-        <button class="btn btn-xs btn-secondary" onclick="openTrialModal('${t.id}')">編集</button>
-        <button class="btn btn-xs btn-success"   onclick="openPrepSheet('${t.id}')">調製</button>
-        <button class="btn btn-xs btn-danger"    onclick="deleteTrial('${t.id}')">削除</button>
+      <td class="col-actions" style="white-space:nowrap;text-align:center">
+        <button class="btn btn-xs btn-secondary" title="編集" onclick="openTrialModal('${t.id}')">✎</button>
+        <button class="btn btn-xs btn-success" title="調製" onclick="openPrepSheet('${t.id}')">準</button>
+        <button class="btn btn-xs btn-danger" title="削除" onclick="deleteTrial('${t.id}')">✕</button>
       </td>
-      <td>${statusBadge(t.status || '計画中')}</td>
-      <td>${escHtml(foodTypeLabel(t.food_type))}</td>
-      <td style="max-width:200px;font-size:12px">${escHtml(t.food_a_overview || '-')}</td>
-      <td style="max-width:200px;font-size:12px">${escHtml(t.food_b_overview || '-')}</td>
-      <td>${escHtml(t.person_in_charge || '')}</td>
-      <td>${escHtml(t.purpose || '')}</td>
-      <td style="max-width:120px;font-size:11px">${escHtml(t.notes || '')}</td>
-      <td>${escHtml(t.supplier || '')}</td>
-      <td style="text-align:center">${t.animal_count ?? '-'}</td>
-      <td>${prefBar(t.preference_rate_a, t.preference_rate_b)}</td>
+      ${(visibleCols || []).map(col => `<td>${cellMap[col]?.() || ''}</td>`).join('')}
     </tr>`;
 }
 
@@ -671,12 +685,24 @@ async function fillDatalistFromDropdown(listId, category) {
 }
 
 // ── リサイズ可能テーブル ──────────────────────────────────
-// ── 試験計画フィルタ ─────────────────────────────────────
+// ── 試験計画フィルタ・パネル管理 ─────────────────────────
 function toggleTrialFilter() {
-  const p = document.getElementById('trialFilterPanel');
-  if (!p) return;
-  const open = p.style.display !== 'none';
-  p.style.display = open ? 'none' : 'block';
+  _trialShowFilter = !_trialShowFilter;
+  _renderTrialTab();
+}
+
+function toggleTrialColSel() {
+  _trialShowColSel = !_trialShowColSel;
+  _renderTrialTab();
+}
+
+function toggleTrialCol(col, checked) {
+  if (checked) {
+    if (!_trialVisibleCols.includes(col)) _trialVisibleCols.push(col);
+  } else {
+    _trialVisibleCols = _trialVisibleCols.filter(c => c !== col);
+  }
+  _renderTrialTab();
 }
 
 function applyTrialFilter() {

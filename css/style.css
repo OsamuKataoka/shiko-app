@@ -586,3 +586,68 @@ input.table-input:focus, select.table-input:focus {
 }
 .col-settings-item:hover { background: var(--gray-50); }
 .col-settings-item input[type="checkbox"] { cursor: pointer; }
+
+/* ── Sticky columns (first col on left, first row on top) ── */
+.table-with-sticky-cols {
+  position: relative;
+}
+.table-with-sticky-cols thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+}
+.table-with-sticky-cols th:first-child,
+.table-with-sticky-cols td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 9;
+  background: #fff;
+}
+.table-with-sticky-cols th:nth-child(2),
+.table-with-sticky-cols td:nth-child(2) {
+  position: sticky;
+  left: 130px;
+  z-index: 9;
+  background: #fff;
+}
+.table-with-sticky-cols thead th:first-child {
+  z-index: 11;
+  background: var(--gray-50);
+  border-bottom: 2px solid var(--gray-200);
+}
+.table-with-sticky-cols thead th:nth-child(2) {
+  z-index: 11;
+  background: var(--gray-50);
+  border-bottom: 2px solid var(--gray-200);
+}
+
+/* ── Compact panel controls ── */
+.panel-toggle-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.panel-toggle-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--gray-600);
+}
+.panel-toggle-btn:hover {
+  background: var(--gray-50);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.panel-toggle-btn.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+}
