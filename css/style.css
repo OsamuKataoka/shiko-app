@@ -604,19 +604,7 @@ input.table-input:focus, select.table-input:focus {
   z-index: 9;
   background: #fff;
 }
-.table-with-sticky-cols th:nth-child(2),
-.table-with-sticky-cols td:nth-child(2) {
-  position: sticky;
-  left: 130px;
-  z-index: 9;
-  background: #fff;
-}
 .table-with-sticky-cols thead th:first-child {
-  z-index: 11;
-  background: var(--gray-50);
-  border-bottom: 2px solid var(--gray-200);
-}
-.table-with-sticky-cols thead th:nth-child(2) {
   z-index: 11;
   background: var(--gray-50);
   border-bottom: 2px solid var(--gray-200);

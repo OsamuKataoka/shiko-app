@@ -7,6 +7,8 @@ let _resFilterState = {};   // フィルタ状態
 let _resSortKey     = 'trial_date_start';
 let _resSortAsc     = false;
 let _editResultId   = null; // 編集中の trial_id
+let _resShowFilter  = false; // フィルタパネル表示状態
+let _resShowColSel  = false; // 列設定パネル表示状態
 
 // ── 結果一覧 ─────────────────────────────────────────────
 async function renderResultList(species) {
@@ -40,29 +42,18 @@ async function renderResultList(species) {
   const visibleCols = columns.filter(c => c.visible && c.column_key !== 'trial_date_label');
 
   setContent(`
-    <!-- 表示列設定パネル -->
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-header" style="cursor:pointer" onclick="toggleColSettings()">
-        <span class="card-title">表示列設定</span>
-        <span id="colSettingsToggle" style="font-size:12px;color:var(--gray-400)">▼ 展開</span>
-      </div>
-      <div id="colSettingsPanel" style="display:none">
-        <div class="col-toggle-grid" style="padding:12px">
-          ${columns.filter(c => c.column_key !== 'trial_date_label').map(c => `
-            <label class="col-toggle-item">
-              <input type="checkbox" ${c.visible?'checked':''} onchange="toggleResultColumn('${c.id}',this.checked)">
-              ${escHtml(c.label)}
-            </label>`).join('')}
-        </div>
-      </div>
+    <div class="panel-toggle-bar" style="margin-bottom:12px">
+      <button class="panel-toggle-btn${_resShowFilter?' active':''}" onclick="toggleFilterPanel()">
+        フィルタ・ソート ${_resShowFilter ? '▲' : '▼'}
+      </button>
+      <button class="panel-toggle-btn${_resShowColSel?' active':''}" onclick="toggleColSettings()">
+        表示列設定 ${_resShowColSel ? '▲' : '▼'}
+      </button>
     </div>
 
     <!-- フィルタバー -->
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-header" style="cursor:pointer" onclick="toggleFilterPanel()">
-        <span class="card-title">絞り込み・ソート</span>
-        <span id="filterToggle" style="font-size:12px;color:var(--gray-400)">▼ 展開</span>
-      </div>
+    <div class="card" style="margin-bottom:12px;${_resShowFilter?'':'display:none'}" id="filterCard">
+      <div class="card-body" style="padding:12px">
       <div id="filterPanel" style="display:none;padding:14px">
         <div class="form-grid form-grid-3" style="gap:12px">
           <div class="form-group">
@@ -135,6 +126,20 @@ async function renderResultList(species) {
       </div>
     </div>
 
+    <!-- 表示列設定パネル -->
+    <div class="card" style="margin-bottom:12px;${_resShowColSel?'':'display:none'}" id="colPanel">
+      <div class="card-body" style="padding:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:8px">テーブルに表示する列</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+          ${columns.filter(c => c.column_key !== 'trial_date_label').map(c => `
+            <label class="col-toggle-item" style="padding:6px 8px">
+              <input type="checkbox" ${c.visible?'checked':''} onchange="toggleResultColumn('${c.id}',this.checked)">
+              ${escHtml(c.label)}
+            </label>`).join('')}
+        </div>
+      </div>
+    </div>
+
     <!-- 結果テーブル -->
     <div class="card">
       <div class="card-header">
@@ -195,20 +200,14 @@ function buildResRows(trials, analysisMap, visibleCols) {
 
 // ── フィルタ ─────────────────────────────────────────────
 function toggleColSettings() {
-  const p = document.getElementById('colSettingsPanel');
-  const t = document.getElementById('colSettingsToggle');
-  if (!p) return;
-  const open = p.style.display !== 'none';
-  p.style.display = open ? 'none' : 'block';
-  t.textContent   = open ? '▼ 展開' : '▲ 閉じる';
+  _resShowColSel = !_resShowColSel;
+  const p = document.getElementById('colPanel');
+  if (p) p.style.display = _resShowColSel ? 'block' : 'none';
 }
 function toggleFilterPanel() {
-  const p = document.getElementById('filterPanel');
-  const t = document.getElementById('filterToggle');
-  if (!p) return;
-  const open = p.style.display !== 'none';
-  p.style.display = open ? 'none' : 'block';
-  t.textContent   = open ? '▼ 展開' : '▲ 閉じる';
+  _resShowFilter = !_resShowFilter;
+  const p = document.getElementById('filterCard');
+  if (p) p.style.display = _resShowFilter ? 'block' : 'none';
 }
 
 function getChecked(cls) {
