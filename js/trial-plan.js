@@ -318,9 +318,8 @@ function renderTrialModal() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           ${['A','B'].map(side => `
           <div>
-            <div style="font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">
-              <span class="side-badge side-${side.toLowerCase()}">${side==='A'?'A':'B'}</span>
-              フード ${side}
+            <div style="font-weight:700;margin-bottom:6px">
+              レシピ
             </div>
             <div class="form-group" style="margin-bottom:8px">
               <label>調製総重量 (g)</label>

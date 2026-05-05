@@ -185,8 +185,8 @@ function buildResRows(trials, analysisMap, visibleCols) {
     return `<tr>
       <td style="white-space:nowrap;font-weight:600">${escHtml(t.trial_date_label || formatDate(t.trial_date_start))}</td>
       <td class="col-actions" style="white-space:nowrap;text-align:center">
-        <button class="btn btn-xs btn-secondary" title="結果入力" onclick="openResultEdit('${t.id}')">✎</button>
-        ${a.id ? `<button class="btn btn-xs btn-success" title="詳細表示" onclick="openResultDetail('${t.id}')">◆</button>` : ''}
+        <button class="btn btn-xs btn-secondary" title="編集" onclick="openResultEdit('${t.id}')">編集</button>
+        <button class="btn btn-xs btn-danger" title="削除" onclick="deleteResult('${t.id}')">削除</button>
       </td>
       ${visibleCols.map(c => `<td>${renderResultCell(c.column_key, t, a)}</td>`).join('')}
     </tr>`;
@@ -280,14 +280,14 @@ function renderResultCell(key, trial, analysis) {
     case 'notes':              return `<span style="font-size:11px">${escHtml(trial.notes || '')}</span>`;
     case 'supplier':           return escHtml(trial.supplier || '');
     case 'person_in_charge':   return escHtml(trial.person_in_charge || '');
-    case 'food_a_overview':    return `<span style="color:#1d4ed8;font-weight:600">フードA:</span> ${escHtml(trial.food_a_overview||'')}`;
-    case 'food_b_overview':    return `<span style="color:#b45309;font-weight:600">フードB:</span> ${escHtml(trial.food_b_overview||'')}`;
+    case 'food_a_overview':    return `${escHtml(trial.food_a_overview||'')}`;
+    case 'food_b_overview':    return `${escHtml(trial.food_b_overview||'')}`;
     case 'status':             return statusBadge(trial.status || '計画中');
     case 'n_total':            return analysis.n_total ?? '-';
     case 'n_excluded':         return analysis.n_excluded ?? '-';
     case 'n_used':             return analysis.n_used ?? '-';
-    case 'mean_a_ratio_avg':   return analysis.mean_a_ratio_avg != null ? `<span style="color:#1d4ed8;font-weight:700">${fmtPct(analysis.mean_a_ratio_avg)}</span>` : '-';
-    case 'mean_b_ratio_avg':   return analysis.mean_b_ratio_avg != null ? `<span style="color:#b45309;font-weight:700">${fmtPct(analysis.mean_b_ratio_avg)}</span>` : '-';
+    case 'mean_a_ratio_avg':   return analysis.mean_a_ratio_avg != null ? fmtPct(analysis.mean_a_ratio_avg) : '-';
+    case 'mean_b_ratio_avg':   return analysis.mean_b_ratio_avg != null ? fmtPct(analysis.mean_b_ratio_avg) : '-';
     case 'median_a_ratio_avg': return fmtPct(analysis.median_a_ratio_avg);
     case 'median_b_ratio_avg': return fmtPct(analysis.median_b_ratio_avg);
     case 'stat_test_used':     return escHtml(analysis.stat_test_used || '-');
@@ -300,7 +300,7 @@ function renderResultCell(key, trial, analysis) {
     case 'effect_size_label':  return escHtml(analysis.effect_size_label || '-');
     case 'winner': {
       if (!analysis.winner) return '-';
-      const m = { A:'<span style="color:#1d4ed8;font-weight:700">フードA勝</span>', B:'<span style="color:#b45309;font-weight:700">フードB勝</span>', tie:'引き分け', inconclusive:'判定不能' };
+      const m = { A:'優位', B:'優位', tie:'引き分け', inconclusive:'判定不能' };
       return m[analysis.winner] || escHtml(analysis.winner);
     }
     default: return '';
@@ -496,6 +496,17 @@ async function saveResultEdit() {
     await renderResultList(species);
   } catch (e) {
     showToast('保存に失敗しました: ' + e.message, 'error');
+  }
+}
+
+async function deleteResult(trialId) {
+  if (!confirm('この結果を削除しますか？')) return;
+  try {
+    await sb.from('pal_analysis').delete().eq('trial_id', trialId);
+    showToast('削除しました', 'success');
+    await renderResultList(_resSpecies);
+  } catch (e) {
+    showToast('削除に失敗しました: ' + e.message, 'error');
   }
 }
 
