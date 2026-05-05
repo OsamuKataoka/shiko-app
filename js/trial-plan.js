@@ -152,7 +152,7 @@ async function _renderTrialTab() {
 
   // 表示列設定パネル
   const allCols = ['status','food_type','food_a','food_b','person','purpose','notes','supplier','count'];
-  const colLabels = { status:'状態', food_type:'種別', food_a:'フードA', food_b:'フードB', person:'担当者', purpose:'目的', notes:'備考', supplier:'サプライヤー', count:'頭数' };
+  const colLabels = { status:'状態', food_type:'種別', food_a:'レシピ', food_b:'レシピ', person:'担当者', purpose:'目的', notes:'備考', supplier:'サプライヤー', count:'頭数' };
   const colPanel = `
     <div id="trialColSelPanel" class="card" style="margin-top:12px;${_trialShowColSel?'':'display:none'}">
       <div class="card-body" style="padding:12px">
@@ -182,7 +182,7 @@ async function _renderTrialTab() {
               <th data-col="date" style="width:120px">試験日</th>
               <th data-col="actions" style="width:130px;text-align:center">編集・調製・削除</th>
               ${_trialVisibleCols.map(col => {
-                const labels = { status:'状態', food_type:'種別', food_a:'フードA', food_b:'フードB', person:'担当者', purpose:'目的', notes:'備考', supplier:'サプライヤー', count:'頭数' };
+                const labels = { status:'状態', food_type:'種別', food_a:'レシピ', food_b:'レシピ', person:'担当者', purpose:'目的', notes:'備考', supplier:'サプライヤー', count:'頭数' };
                 return `<th data-col="${col}">${labels[col]}</th>`;
               }).join('')}
             </tr>
@@ -221,9 +221,9 @@ function renderTrialRow(t, visibleCols) {
     <tr class="trial-row-summary" data-trial-id="${t.id}">
       <td style="white-space:nowrap;font-weight:700">${escHtml(t.trial_date_label || formatDate(t.trial_date_start))}</td>
       <td class="col-actions" style="white-space:nowrap;text-align:center">
-        <button class="btn btn-xs btn-secondary" title="編集" onclick="openTrialModal('${t.id}')">✎</button>
-        <button class="btn btn-xs btn-success" title="調製" onclick="openPrepSheet('${t.id}')">準</button>
-        <button class="btn btn-xs btn-danger" title="削除" onclick="deleteTrial('${t.id}')">✕</button>
+        <button class="btn btn-xs btn-secondary" title="編集" onclick="openTrialModal('${t.id}')">編集</button>
+        <button class="btn btn-xs btn-success" title="調製" onclick="openPrepSheet('${t.id}')">調製</button>
+        <button class="btn btn-xs btn-danger" title="削除" onclick="deleteTrial('${t.id}')">削除</button>
       </td>
       ${(visibleCols || []).map(col => `<td>${cellMap[col]?.() || ''}</td>`).join('')}
     </tr>`;
