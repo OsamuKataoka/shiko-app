@@ -91,11 +91,25 @@
       <p>Palatability Assessment Workspace</p>
     </div>
     <div class="error-msg" id="errorMsg"></div>
-    <label for="email">メールアドレス</label>
-    <input type="email" id="email" placeholder="example@nosan.co.jp" autocomplete="email">
-    <label for="password">パスワード</label>
-    <input type="password" id="password" placeholder="パスワード" autocomplete="current-password">
-    <button class="btn-login" id="loginBtn" onclick="doLogin()">ログイン</button>
+
+    <!-- ログインフォーム -->
+    <div id="loginForm" style="display:flex;flex-direction:column;">
+      <label for="email">メールアドレス</label>
+      <input type="email" id="email" placeholder="example@nosan.co.jp" autocomplete="email">
+      <label for="password">パスワード</label>
+      <input type="password" id="password" placeholder="パスワード" autocomplete="current-password">
+      <button class="btn-login" id="loginBtn" onclick="doLogin()">ログイン</button>
+    </div>
+
+    <!-- パスワードリセットフォーム -->
+    <div id="resetForm" style="display:none;flex-direction:column;">
+      <label for="resetEmail">メールアドレス</label>
+      <input type="email" id="resetEmail" placeholder="example@nosan.co.jp" disabled autocomplete="email">
+      <label for="newPassword">新しいパスワード（8文字以上）</label>
+      <input type="password" id="newPassword" placeholder="8文字以上">
+      <button class="btn-login" id="resetBtn" onclick="doResetPassword()">パスワードを変更</button>
+      <button style="margin-top:8px;background:#999;" onclick="cancelReset()">キャンセル</button>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -107,6 +121,23 @@
     sb.auth.getSession().then(({ data }) => {
       if (data.session) location.href = 'app.html';
     });
+
+    // URL パラメータから recovery token を検出
+    const params = new URLSearchParams(location.search);
+    const isRecovery = params.get('type') === 'recovery';
+    if (isRecovery) {
+      const token = params.get('token');
+      const email = params.get('email');
+      if (token && email) {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('resetForm').style.display = 'flex';
+        document.getElementById('resetEmail').value = email;
+        document.querySelector('.login-logo h1').textContent = 'パスワードをリセット';
+        document.querySelector('.login-logo p').textContent = '新しいパスワードを設定してください';
+        window._resetToken = token;
+        window._resetEmail = email;
+      }
+    }
 
     document.getElementById('password').addEventListener('keydown', e => {
       if (e.key === 'Enter') doLogin();
@@ -132,6 +163,51 @@
       } else {
         location.href = 'app.html';
       }
+    }
+
+    async function doResetPassword() {
+      const newPw = document.getElementById('newPassword').value;
+      const btn   = document.getElementById('resetBtn');
+      const err   = document.getElementById('errorMsg');
+
+      if (!newPw || newPw.length < 8) {
+        showErr('パスワードは8文字以上にしてください');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading-spinner"></span>パスワードを変更中...';
+      err.style.display = 'none';
+
+      try {
+        const { error } = await sb.auth.verifyOtp({
+          email: window._resetEmail,
+          token: window._resetToken,
+          type: 'recovery',
+          password: newPw
+        });
+
+        if (error) {
+          showErr('パスワード変更に失敗しました: ' + error.message);
+          btn.disabled = false;
+          btn.innerHTML = 'パスワードを変更';
+        } else {
+          err.style.display = 'block';
+          err.style.background = '#f0fff0';
+          err.style.color = '#22c55e';
+          err.style.borderColor = '#bbf7d0';
+          err.textContent = 'パスワードが変更されました。3秒後にログインページに戻ります。';
+          setTimeout(() => { location.href = 'index.html'; }, 3000);
+        }
+      } catch (e) {
+        showErr('エラー: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = 'パスワードを変更';
+      }
+    }
+
+    function cancelReset() {
+      location.href = 'index.html';
     }
 
     function showErr(msg) {
