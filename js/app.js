@@ -51,13 +51,14 @@ function navigate(el) {
 
   // セクション描画
   switch (section) {
-    case 'trial':           renderTrialPlan(species); break;
-    case 'result-list':     renderResultList(species); break;
-    case 'materials':       renderMaterials(); break;
-    case 'dropdowns':       renderDropdowns(); break;
-    case 'prep-checklist':  renderPrepChecklist(); break;
-    case 'stat-settings':   renderStatSettings(); break;
-    case 'user-management': renderUserManagement(); break;
+    case 'trial':            renderTrialPlan(species); break;
+    case 'result-list':      renderResultList(species); break;
+    case 'result-analysis':  renderResultAnalysis(species); break;
+    case 'materials':        renderMaterials(); break;
+    case 'dropdowns':        renderDropdowns(); break;
+    case 'prep-checklist':   renderPrepChecklist(); break;
+    case 'stat-settings':    renderStatSettings(); break;
+    case 'user-management':  renderUserManagement(); break;
     default: setContent('<div class="empty-state"><p>準備中</p></div>');
   }
 }
