@@ -467,7 +467,7 @@ function renderStatForm(s, species) {
             <span style="background:#3b82f6;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;white-space:nowrap">STEP 1</span>
             <div>
               <b>正規性検定手法：Shapiro-Wilk 検定</b><br>
-              <span style="color:var(--gray-500,#64748b)">○採食比と●採食比の差（各個体）が正規分布に従うか検定します。<br>
+              <span style="color:var(--gray-500,#64748b)">フードAとフードBの採食比の差（各個体）が正規分布に従うか検定します。<br>
               p値 &lt; α（正規性判定閾値）→ <b>非正規分布</b> と判定</span>
             </div>
           </div>
@@ -519,7 +519,7 @@ function renderStatForm(s, species) {
             <small style="font-size:11px;color:var(--gray-400)">p &lt; α → 非正規 → ウィルコクソン符号順位和検定を使用</small>
           </div>
           <div class="form-group">
-            <label>有意差判定 有意水準 α（○●フードに差があるかの境界）</label>
+            <label>有意差判定 有意水準 α（フード間に差があるかの境界）</label>
             <input type="number" class="form-control" id="st-sig-alpha" step="0.01" min="0.01" max="0.20"
               value="${s.significance_alpha ?? 0.05}">
             <small style="font-size:11px;color:var(--gray-400)">p &lt; α → 有意差あり（T検定・ウィルコクソン共通）</small>
@@ -536,7 +536,7 @@ function renderStatForm(s, species) {
             <label>除外基準 最小摂食率 (%)</label>
             <input type="number" class="form-control" id="st-exc-min" step="1" min="0"
               value="${s.exclusion_min_ratio ?? 10}">
-            <small style="font-size:11px;color:var(--gray-400)">○●合計摂食率がこの値未満の個体を統計解析から除外</small>
+            <small style="font-size:11px;color:var(--gray-400)">フード合計摂食率がこの値未満の個体を統計解析から除外</small>
           </div>
           <div class="form-group">
             <label>警告基準 最大摂食率 (%)</label>

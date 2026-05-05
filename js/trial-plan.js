@@ -319,7 +319,7 @@ function renderTrialModal() {
           ${['A','B'].map(side => `
           <div>
             <div style="font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">
-              <span class="side-badge side-${side.toLowerCase()}">${side==='A'?'○':'●'}</span>
+              <span class="side-badge side-${side.toLowerCase()}">${side==='A'?'A':'B'}</span>
               フード ${side}
             </div>
             <div class="form-group" style="margin-bottom:8px">

@@ -435,8 +435,8 @@ async function openResultEdit(trialId) {
         <label>結果判定</label>
         <select class="form-control" id="re-winner">
           <option value=""    ${!a.winner?'selected':''}>-- 未選択 --</option>
-          <option value="A"   ${a.winner==='A'?'selected':''}>○ フードA が優位</option>
-          <option value="B"   ${a.winner==='B'?'selected':''}>● フードB が優位</option>
+          <option value="A"   ${a.winner==='A'?'selected':''}>フードA が優位</option>
+          <option value="B"   ${a.winner==='B'?'selected':''}>フードB が優位</option>
           <option value="tie" ${a.winner==='tie'?'selected':''}>差なし（引き分け）</option>
           <option value="inconclusive" ${a.winner==='inconclusive'?'selected':''}>判定不能</option>
         </select>
@@ -518,7 +518,7 @@ async function openResultDetail(trialId) {
     return;
   }
 
-  const winnerLabel = { A:'○フード(A)が優位', B:'●フード(B)が優位', tie:'引き分け', inconclusive:'判定不能' };
+  const winnerLabel = { A:'フード(A)が優位', B:'フード(B)が優位', tie:'引き分け', inconclusive:'判定不能' };
 
   document.getElementById('resultDetailBody').innerHTML = `
     <div class="stat-result-card">

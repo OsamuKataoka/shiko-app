@@ -82,8 +82,8 @@ function renderPrepHeader(checklist, foodType, species, location, ingA, ingB) {
     <table class="prep-table">
       <thead>
         <tr>
-          <th>〇原料No.</th><th>〇レシピ</th><th>〇重量(g)</th>
-          <th>●原料No.</th><th>●レシピ</th><th>●重量(g)</th>
+          <th>フードA原料No.</th><th>フードAレシピ</th><th>フードA重量(g)</th>
+          <th>フードB原料No.</th><th>フードBレシピ</th><th>フードB重量(g)</th>
         </tr>
       </thead>
       <tbody>
@@ -96,8 +96,8 @@ function renderPrepHeader(checklist, foodType, species, location, ingA, ingB) {
         </tr>
       </tbody>
     </table>
-    <div>〇フード: <strong>${escHtml(t.food_a_overview||'')}</strong></div>
-    <div>●フード: <strong>${escHtml(t.food_b_overview||'')}</strong></div>
+    <div>フードA: <strong>${escHtml(t.food_a_overview||'')}</strong></div>
+    <div>フードB: <strong>${escHtml(t.food_b_overview||'')}</strong></div>
 
     <div class="section-title">＜調製者チェック欄＞</div>
     <div id="checklistItems">
@@ -215,8 +215,8 @@ function renderPrepAnimalTableDry() {
           <th class="no-print" rowspan="2"></th>
         </tr>
         <tr>
-          <th>○残餌g</th><th>●残餌g</th>
-          <th>●残餌g</th><th>○残餌g</th>
+          <th>フードA残餌g</th><th>フードB残餌g</th>
+          <th>フードB残餌g</th><th>フードA残餌g</th>
         </tr>
       </thead>
       <tbody>
@@ -231,10 +231,10 @@ function renderPrepAnimalTableDry() {
               <input class="table-input" type="number" value="${a.food_given_g}" style="width:56px"
                 onchange="updatePrepAnimal(${i},'food_given_g',this.value)">
             </td>
-            <td style="text-align:center">○　　●</td>
+            <td style="text-align:center">フードA　フードB</td>
             <td><input class="table-input" style="width:60px" placeholder="g"></td>
             <td><input class="table-input" style="width:60px" placeholder="g"></td>
-            <td style="text-align:center">●　　○</td>
+            <td style="text-align:center">フードB　フードA</td>
             <td><input class="table-input" style="width:60px" placeholder="g"></td>
             <td><input class="table-input" style="width:60px" placeholder="g"></td>
             <td class="no-print">
@@ -270,14 +270,14 @@ function renderPrepAnimalTableWet() {
           <th class="no-print" rowspan="3"></th>
         </tr>
         <tr>
-          <th colspan="2">○先</th><th colspan="2">●先</th>
-          <th colspan="2">●先</th><th colspan="2">○先</th>
+          <th colspan="2">フードA先</th><th colspan="2">フードB先</th>
+          <th colspan="2">フードB先</th><th colspan="2">フードA先</th>
         </tr>
         <tr>
-          <th>○総量(g)</th><th>○残餌(g)</th>
-          <th>●総量(g)</th><th>●残餌(g)</th>
-          <th>●総量(g)</th><th>●残餌(g)</th>
-          <th>○総量(g)</th><th>○残餌(g)</th>
+          <th>フードA総量(g)</th><th>フードA残餌(g)</th>
+          <th>フードB総量(g)</th><th>フードB残餌(g)</th>
+          <th>フードB総量(g)</th><th>フードB残餌(g)</th>
+          <th>フードA総量(g)</th><th>フードA残餌(g)</th>
         </tr>
       </thead>
       <tbody>
