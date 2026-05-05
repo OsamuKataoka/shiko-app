@@ -116,13 +116,15 @@ function renderAnalysisHeader() {
   const t = _analysisTrial;
   const speciesLabel = _analysisSpecies === 'cat' ? '猫' : '犬';
   const foodTypeLabel = t.food_type === 'wet' ? 'ウェット' : 'ドライ';
+  const discCode = generateDiscriminationCode(t.trial_date_start, t.location);
 
   return `
     <div style="margin-bottom:16px">
       <h2>【${speciesLabel}用】嗜好試験結果 (${foodTypeLabel})</h2>
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
         <div><strong>試験担当者:</strong> ${escHtml(t.person_in_charge||'')} &emsp;
-             <strong>サプライヤー:</strong> ${escHtml(t.supplier||'')}</div>
+             <strong>サプライヤー:</strong> ${escHtml(t.supplier||'')} &emsp;
+             <strong>判別式:</strong> <code style="background:#f0f0f0;padding:2px 6px;border-radius:3px">${escHtml(discCode)}</code></div>
         <div><strong>試験日:</strong> ${escHtml(t.trial_date_label||'')}</div>
       </div>
       <div style="font-size:13px">
@@ -131,6 +133,28 @@ function renderAnalysisHeader() {
       </div>
     </div>
   `;
+}
+
+// 判別式を動的に生成（試験日 + 試験場所）
+function generateDiscriminationCode(trialDate, location) {
+  if (!trialDate) return '';
+
+  // 試験日をYYYY/M/D形式に変換
+  const date = new Date(trialDate);
+  const yyyy = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const dateStr = `${yyyy}/${m}/${d}`;
+
+  // 試験場所から判別コードを取得
+  let locCode = location || '';
+  if (_analysisSpecies === 'cat') {
+    locCode = location === 'O' ? '-O' : '-R';  // デフォルト R
+  } else {
+    locCode = location === 'I' ? '-I' : '';     // 犬RDC は空
+  }
+
+  return dateStr + locCode;
 }
 
 function renderAnimalDataTable() {
@@ -231,16 +255,16 @@ function renderAnimalRow(animal, idx) {
       <td><input class="table-input" type="number" style="width:60px" value="${d.session1.remaining_b || ''}" placeholder="g" onchange="updateAnalysisData('${animal.id}', 'session1.remaining_b', this.value); recalcAnalysisRow('${animal.id}')"></td>
       <td><input class="table-input" type="number" style="width:60px" value="${d.session2.remaining_a || ''}" placeholder="g" onchange="updateAnalysisData('${animal.id}', 'session2.remaining_a', this.value); recalcAnalysisRow('${animal.id}')"></td>
       <td><input class="table-input" type="number" style="width:60px" value="${d.session2.remaining_b || ''}" placeholder="g" onchange="updateAnalysisData('${animal.id}', 'session2.remaining_b', this.value); recalcAnalysisRow('${animal.id}')"></td>
-      <td style="text-align:center;background:#f5f5f5">${s1_intake_a}</td>
-      <td style="text-align:center;background:#f5f5f5">${s1_intake_b}</td>
-      <td style="text-align:center;background:#f5f5f5">${s2_intake_b}</td>
-      <td style="text-align:center;background:#f5f5f5">${s2_intake_a}</td>
-      <td style="text-align:center;background:#f9f9f9">${s1_ratio_a}</td>
-      <td style="text-align:center;background:#f9f9f9">${s1_ratio_b}</td>
-      <td style="text-align:center;background:#f9f9f9">${s2_ratio_b}</td>
-      <td style="text-align:center;background:#f9f9f9">${s2_ratio_a}</td>
-      <td style="text-align:center;background:#fff9e6;font-weight:600">${avg_ratio_a}</td>
-      <td style="text-align:center;background:#fff9e6;font-weight:600">${avg_ratio_b}</td>
+      <td style="text-align:center;${getAlertCellStyle(s1_intake_a, 'intake', g)}">${s1_intake_a}</td>
+      <td style="text-align:center;${getAlertCellStyle(s1_intake_b, 'intake', g)}">${s1_intake_b}</td>
+      <td style="text-align:center;${getAlertCellStyle(s2_intake_b, 'intake', g)}">${s2_intake_b}</td>
+      <td style="text-align:center;${getAlertCellStyle(s2_intake_a, 'intake', g)}">${s2_intake_a}</td>
+      <td style="text-align:center;${getComparisonCellStyle(s1_ratio_a, s1_ratio_b)}">${s1_ratio_a}</td>
+      <td style="text-align:center;${getComparisonCellStyle(s1_ratio_b, s1_ratio_a)}">${s1_ratio_b}</td>
+      <td style="text-align:center;${getComparisonCellStyle(s2_ratio_b, s2_ratio_a)}">${s2_ratio_b}</td>
+      <td style="text-align:center;${getComparisonCellStyle(s2_ratio_a, s2_ratio_b)}">${s2_ratio_a}</td>
+      <td style="text-align:center;${getComparisonCellStyle(avg_ratio_a, avg_ratio_b)};font-weight:600">${avg_ratio_a}</td>
+      <td style="text-align:center;${getComparisonCellStyle(avg_ratio_b, avg_ratio_a)};font-weight:600">${avg_ratio_b}</td>
     </tr>
   `;
 }
@@ -262,6 +286,61 @@ function recalcAnalysisRow(animalId) {
   if (trialSelectEl) {
     loadAnalysisTrial(_analysisTrialId);
   }
+}
+
+// ✅ 条件付き書式：採食量のアラート判定
+function getAlertCellStyle(intake, alertType, givenGram) {
+  const g = Number(givenGram) || 0;
+  const intakeNum = Number(intake) || 0;
+
+  if (!g || intakeNum < 0) return 'background:#fff;';
+
+  // アラート閾値
+  const danger = g * 0.1;    // 危険10%
+  const warning = g * 0.3;   // 注意30%
+  const excess = g * 1.3;    // 食べ過ぎ130%
+
+  // 危険アラート（赤背景、白テキスト）
+  if (intakeNum <= danger) return 'background:#d32f2f;color:white;font-weight:bold;';
+
+  // 注意アラート（オレンジ背景、黒テキスト）
+  if (intakeNum <= warning) return 'background:#ff9800;color:black;';
+
+  // 食べ過ぎアラート（黄色背景、黒テキスト）
+  if (intakeNum >= excess) return 'background:#fbc02d;color:black;';
+
+  return 'background:#fff;';
+}
+
+// ✅ 条件付き書式：採食比差の色分け
+function getComparisonCellStyle(ratioA, ratioB) {
+  const a = Number(ratioA) || 0;
+  const b = Number(ratioB) || 0;
+  const diff = a - b;
+
+  // 大きく優位（40%以上差）
+  if (Math.abs(diff) >= 40) return 'background:#d32f2f;color:white;font-weight:bold;';
+
+  // 中程度優位（20%以上差）
+  if (Math.abs(diff) >= 20) return 'background:#ff9800;color:black;';
+
+  return 'background:#fff;';
+}
+
+// ✅ 条件付き書式：有意差判定の色分け
+function getSignificanceCellStyle(pValue) {
+  const p = Number(pValue);
+
+  if (isNaN(p)) return 'color:#999;';
+
+  // p < 0.01（赤、強調）
+  if (p < 0.01) return 'color:#d32f2f;font-weight:bold;';
+
+  // p < 0.05（オレンジ）
+  if (p < 0.05) return 'color:#ff9800;font-weight:600;';
+
+  // N.S.（グレー）
+  return 'color:#999;';
 }
 
 function renderStatsAnalysisSection() {
@@ -541,13 +620,17 @@ function displayStatsResults() {
     const p_corr = r.p_value_corrected != null ? r.p_value_corrected.toFixed(6) : '-';
     const sig = r.significance || '-';
 
+    // p値に基づいた背景色・フォント色を適用
+    const pValueNum = Number(r.p_value_corrected);
+    const sigStyle = getSignificanceCellStyle(pValueNum);
+
     html += `
       <tr>
         <td style="text-align:center">${range}%</td>
         <td style="text-align:center">${chi}</td>
         <td style="text-align:center">${p}</td>
-        <td style="text-align:center"><strong>${p_corr}</strong></td>
-        <td style="text-align:center;font-weight:600">${sig}</td>
+        <td style="text-align:center"><strong style="${sigStyle}">${p_corr}</strong></td>
+        <td style="text-align:center;font-weight:600;${sigStyle}">${sig}</td>
       </tr>
     `;
   });
