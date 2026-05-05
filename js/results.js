@@ -36,7 +36,8 @@ async function renderResultList(species) {
   const locations  = [...new Set(allTrials.map(t=>t.location))].sort();
   const foodTypes  = [...new Set(allTrials.map(t=>t.food_type).filter(Boolean))].sort();
 
-  const visibleCols = columns.filter(c => c.visible);
+  // trial_date_label を除外（重複防止）
+  const visibleCols = columns.filter(c => c.visible && c.column_key !== 'trial_date_label');
 
   setContent(`
     <!-- 表示列設定パネル -->
@@ -47,7 +48,7 @@ async function renderResultList(species) {
       </div>
       <div id="colSettingsPanel" style="display:none">
         <div class="col-toggle-grid" style="padding:12px">
-          ${columns.map(c => `
+          ${columns.filter(c => c.column_key !== 'trial_date_label').map(c => `
             <label class="col-toggle-item">
               <input type="checkbox" ${c.visible?'checked':''} onchange="toggleResultColumn('${c.id}',this.checked)">
               ${escHtml(c.label)}
@@ -261,7 +262,12 @@ function clearResFilter() {
 async function toggleResultColumn(id, visible) {
   try {
     await dbUpdate('result_list_columns', id, { visible });
-  } catch (e) { console.error(e); }
+    // UI を即座に再描画
+    await renderResultList(_resSpecies);
+  } catch (e) {
+    console.error('列設定更新エラー:', e);
+    showToast('列設定の更新に失敗しました', 'error');
+  }
 }
 
 // ── 結果セル ─────────────────────────────────────────────
@@ -285,7 +291,6 @@ function renderResultCell(key, trial, analysis) {
     case 'median_a_ratio_avg': return fmtPct(analysis.median_a_ratio_avg);
     case 'median_b_ratio_avg': return fmtPct(analysis.median_b_ratio_avg);
     case 'stat_test_used':     return escHtml(analysis.stat_test_used || '-');
-    case 'p_value':            return analysis.p_value != null ? fmtNum(analysis.p_value, 4) : '-';
     case 'is_significant':
       if (analysis.is_significant == null) return '-';
       return analysis.is_significant
@@ -364,15 +369,11 @@ async function openResultEdit(trialId) {
     </p>
     <div class="form-grid form-grid-2">
       <div class="form-group">
-        <label>解析頭数合計</label>
+        <label>総数（試験参加頭数）</label>
         <input type="number" class="form-control" id="re-n-total" value="${a.n_total??''}">
       </div>
       <div class="form-group">
-        <label>除外頭数</label>
-        <input type="number" class="form-control" id="re-n-excluded" value="${a.n_excluded??''}">
-      </div>
-      <div class="form-group">
-        <label>解析頭数</label>
+        <label>解析頭数（統計解析に用いた頭数）</label>
         <input type="number" class="form-control" id="re-n-used" value="${a.n_used??''}">
       </div>
       <div class="form-group">
@@ -384,31 +385,28 @@ async function openResultEdit(trialId) {
         </select>
       </div>
       <div class="form-group">
-        <label>○ フードA 平均採食比 (%)</label>
+        <label>採食比(%)_フードA 平均値</label>
         <input type="number" class="form-control" id="re-mean-a" step="0.01" value="${a.mean_a_ratio_avg??''}">
       </div>
       <div class="form-group">
-        <label>● フードB 平均採食比 (%)</label>
+        <label>採食比(%)_フードB 平均値</label>
         <input type="number" class="form-control" id="re-mean-b" step="0.01" value="${a.mean_b_ratio_avg??''}">
       </div>
       <div class="form-group">
-        <label>○ 中央値 (%)</label>
+        <label>採食比(%)_フードA 中央値</label>
         <input type="number" class="form-control" id="re-med-a" step="0.01" value="${a.median_a_ratio_avg??''}">
       </div>
       <div class="form-group">
-        <label>● 中央値 (%)</label>
+        <label>採食比(%)_フードB 中央値</label>
         <input type="number" class="form-control" id="re-med-b" step="0.01" value="${a.median_b_ratio_avg??''}">
       </div>
       <div class="form-group">
-        <label>p値</label>
-        <input type="number" class="form-control" id="re-pvalue" step="0.0001" value="${a.p_value??''}">
-      </div>
-      <div class="form-group">
-        <label>有意差</label>
+        <label>有意差判定</label>
         <select class="form-control" id="re-significant">
-          <option value="" ${a.is_significant==null?'selected':''}>-- 未選択 --</option>
-          <option value="true"  ${a.is_significant===true ?'selected':''}>有意差あり</option>
-          <option value="false" ${a.is_significant===false?'selected':''}>有意差なし (n.s.)</option>
+          <option value="" ${a.is_significant==null && !a.p_value_category?'selected':''}>-- 未選択 --</option>
+          <option value="p<0.01" ${a.p_value_category==='p<0.01'?'selected':''}>p &lt; 0.01 （有意差あり）</option>
+          <option value="p<0.05" ${a.p_value_category==='p<0.05'?'selected':''}>p &lt; 0.05 （有意差あり）</option>
+          <option value="N.S."   ${a.p_value_category==='N.S.'?'selected':''}>N.S. （有意差なし）</option>
         </select>
       </div>
       <div class="form-group">
@@ -458,22 +456,20 @@ async function saveResultEdit() {
   const analysisId = document.getElementById('re-analysis-id').value;
   const species    = document.getElementById('re-trial-species').value || _resSpecies;
 
-  const pval = parseFloat(document.getElementById('re-pvalue').value);
-  const sig   = document.getElementById('re-significant').value;
+  const sigCategory = document.getElementById('re-significant').value;  // p<0.01, p<0.05, N.S., or empty
 
   const data = {
     trial_id:           _editResultId,
     species,
-    n_total:            parseInt(document.getElementById('re-n-total').value)    || null,
-    n_excluded:         parseInt(document.getElementById('re-n-excluded').value) || null,
-    n_used:             parseInt(document.getElementById('re-n-used').value)     || null,
-    stat_test_used:     document.getElementById('re-test').value                  || null,
-    mean_a_ratio_avg:   parseFloat(document.getElementById('re-mean-a').value)   || null,
-    mean_b_ratio_avg:   parseFloat(document.getElementById('re-mean-b').value)   || null,
-    median_a_ratio_avg: parseFloat(document.getElementById('re-med-a').value)    || null,
-    median_b_ratio_avg: parseFloat(document.getElementById('re-med-b').value)    || null,
-    p_value:            isNaN(pval) ? null : pval,
-    is_significant:     sig === 'true' ? true : sig === 'false' ? false : null,
+    n_total:            parseInt(document.getElementById('re-n-total').value)  || null,
+    n_used:             parseInt(document.getElementById('re-n-used').value)   || null,
+    stat_test_used:     document.getElementById('re-test').value                || null,
+    mean_a_ratio_avg:   parseFloat(document.getElementById('re-mean-a').value) || null,
+    mean_b_ratio_avg:   parseFloat(document.getElementById('re-mean-b').value) || null,
+    median_a_ratio_avg: parseFloat(document.getElementById('re-med-a').value)  || null,
+    median_b_ratio_avg: parseFloat(document.getElementById('re-med-b').value)  || null,
+    p_value_category:   sigCategory || null,
+    is_significant:     sigCategory && sigCategory !== 'N.S.' ? true : sigCategory === 'N.S.' ? false : null,
     effect_size_method: document.getElementById('re-ef-method').value || null,
     effect_size_value:  parseFloat(document.getElementById('re-ef-value').value) || null,
     effect_size_label:  document.getElementById('re-ef-label').value || null,
@@ -529,12 +525,12 @@ async function openResultDetail(trialId) {
       <div class="stat-winner">${winnerLabel[a.winner] || a.winner || '-'}</div>
       <div class="pref-display">
         <div class="pref-block side-a">
-          <div class="pref-label">フードA 平均採食比</div>
+          <div class="pref-label">採食比(%)_フードA</div>
           <div class="pref-value">${fmtPct(a.mean_a_ratio_avg)}</div>
           <div class="pref-label">中央値: ${fmtPct(a.median_a_ratio_avg)}</div>
         </div>
         <div class="pref-block side-b">
-          <div class="pref-label">フードB 平均採食比</div>
+          <div class="pref-label">採食比(%)_フードB</div>
           <div class="pref-value">${fmtPct(a.mean_b_ratio_avg)}</div>
           <div class="pref-label">中央値: ${fmtPct(a.median_b_ratio_avg)}</div>
         </div>
@@ -542,9 +538,10 @@ async function openResultDetail(trialId) {
     </div>
 
     <table class="data-table">
-      <tr><th>解析頭数</th><td>${a.n_used??'-'} / ${a.n_total??'-'} (除外: ${a.n_excluded??'-'})</td></tr>
+      <tr><th>総数</th><td>${a.n_total??'-'} （試験参加頭数）</td></tr>
+      <tr><th>解析頭数</th><td>${a.n_used??'-'} （統計解析に用いた頭数）</td></tr>
       <tr><th>使用した検定</th><td>${a.stat_test_used==='t-test'?'T検定（対応あり）':a.stat_test_used==='wilcoxon'?'ウィルコクソン符号順位和検定':a.stat_test_used||'-'}</td></tr>
-      <tr><th>p値</th><td><strong>${a.p_value!=null?fmtNum(a.p_value,4):'-'}</strong> → ${a.is_significant===true?'<span style="color:var(--success);font-weight:700">有意差あり</span>':a.is_significant===false?'<span style="color:var(--gray-400)">n.s. (有意差なし)</span>':'-'}</td></tr>
+      <tr><th>有意差判定</th><td><strong>${a.p_value_category||'-'}</strong></td></tr>
       <tr><th>効果量</th><td>${escHtml(a.effect_size_method||'-')} = ${a.effect_size_value!=null?fmtNum(a.effect_size_value,3):'-'} (${escHtml(a.effect_size_label||'-')})</td></tr>
       <tr><th>結論</th><td style="font-size:12px">${escHtml(a.conclusion||'')}</td></tr>
       <tr><th>入力日時</th><td style="font-size:12px">${a.computed_at?new Date(a.computed_at).toLocaleString('ja-JP'):''}</td></tr>

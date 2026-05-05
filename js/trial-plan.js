@@ -702,6 +702,7 @@ function toggleTrialCol(col, checked) {
   } else {
     _trialVisibleCols = _trialVisibleCols.filter(c => c !== col);
   }
+  // リアルタイム反映
   _renderTrialTab();
 }
 
