@@ -9,6 +9,9 @@ let _matSortKey = 'material_no';
 let _matSortAsc = true;
 let _matFilter  = '';
 let _editMatId  = null;
+let _matShowFilter = false;  // フィルタパネル表示状態
+let _matShowColSel = false;  // 列設定パネル表示状態
+let _matVisibleCols = ['category','name','class','expiry_date','status','manufacturer','supplier','price','storage'];  // 表示列
 
 async function renderMaterials() {
   setTitle('RDC 原料在庫管理');
@@ -36,56 +39,106 @@ function renderMaterialsInner(allMats) {
     return _matSortAsc ? String(va).localeCompare(String(vb), 'ja') : String(vb).localeCompare(String(va), 'ja');
   });
 
+  // 列定義
+  const allCols = ['category','name','class','expiry_date','status','manufacturer','supplier','price','storage'];
+  const colLabels = { category:'区分', name:'原料名', class:'類別', expiry_date:'賞味期限', status:'ステータス', manufacturer:'製造会社', supplier:'仕入商社', price:'参考単価(円/kg)', storage:'保管場所' };
+
   const html = `
-    <div class="filter-bar">
-      <input placeholder="原料No./名称/区分/会社で検索" style="width:260px"
-        value="${escHtml(_matFilter)}"
-        oninput="_matFilter=this.value;renderMaterialsInner(cacheMaterials||[])">
-      <select onchange="_matFilter=this.value;renderMaterialsInner(cacheMaterials||[])">
-        <option value="">すべての区分</option>
-        ${[...new Set((cacheMaterials||[]).map(m=>m.category).filter(Boolean))].map(c=>`<option ${_matFilter===c?'selected':''}>${escHtml(c)}</option>`).join('')}
-      </select>
+    <div class="panel-toggle-bar" style="margin-bottom:12px">
+      <button class="panel-toggle-btn${_matShowFilter?' active':''}" onclick="toggleMatFilter()">
+        フィルタ・ソート ${_matShowFilter ? '▲' : '▼'}
+      </button>
+      <button class="panel-toggle-btn${_matShowColSel?' active':''}" onclick="toggleMatColSel()">
+        表示列設定 ${_matShowColSel ? '▲' : '▼'}
+      </button>
       <div style="flex:1"></div>
       <button class="btn btn-primary btn-sm" onclick="openMatModal()">＋ 新規登録</button>
     </div>
-    <div class="sort-bar">
-      <label>ソート:</label>
-      ${matSortBtn('material_no','原料No.')}
-      ${matSortBtn('category','区分')}
-      ${matSortBtn('name','原料名')}
-      ${matSortBtn('expiry_date','賞味期限')}
-      ${matSortBtn('manufacturer','製造会社')}
-      <span style="font-size:12px;color:var(--gray-400)">${mats.length} 件</span>
+
+    <!-- フィルタパネル -->
+    <div class="card" style="margin-bottom:12px;${_matShowFilter?'':'display:none'}" id="matFilterCard">
+      <div class="card-body" style="padding:12px">
+        <div class="form-grid form-grid-3" style="gap:10px;margin-bottom:10px">
+          <div class="form-group">
+            <label style="font-size:11px;font-weight:600">キーワード検索</label>
+            <input class="form-control" id="f-mat-keyword" placeholder="原料No./名称/会社等..." value="${escHtml(_matFilter||'')}" oninput="_matFilter=this.value;renderMaterialsInner(cacheMaterials||[])">
+          </div>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:4px">区分</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${[...new Set((cacheMaterials||[]).map(m=>m.category).filter(Boolean))].map(c => `<label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer"><input type="checkbox" value="${escHtml(c)}" class="f-mat-category" onchange="applyMatFilter()">${escHtml(c)}</label>`).join('')}
+            </div>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:4px">ステータス</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${[...new Set((cacheMaterials||[]).map(m=>m.status).filter(Boolean))].map(s => `<label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer"><input type="checkbox" value="${escHtml(s)}" class="f-mat-status" onchange="applyMatFilter()">${materialStatusBadge(s)}</label>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <label style="font-size:11px;font-weight:600">ソート:</label>
+          ${matSortBtn('material_no','原料No.')}
+          ${matSortBtn('category','区分')}
+          ${matSortBtn('name','原料名')}
+          ${matSortBtn('expiry_date','賞味期限')}
+          <button class="btn btn-secondary btn-xs" onclick="clearMatFilter()">リセット</button>
+        </div>
+      </div>
     </div>
-    <div class="card">
+
+    <!-- 列設定パネル -->
+    <div class="card" style="margin-bottom:12px;${_matShowColSel?'':'display:none'}" id="matColPanel">
+      <div class="card-body" style="padding:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:8px">テーブルに表示する列</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+          ${allCols.map(col => `
+            <label class="col-toggle-item" style="padding:6px 8px">
+              <input type="checkbox" ${_matVisibleCols.includes(col)?'checked':''} onchange="toggleMatCol('${col}',this.checked)">
+              ${colLabels[col]}
+            </label>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">
+        <span class="card-title">原料一覧</span>
+        <span style="font-size:12px;color:var(--gray-400)">${mats.length} 件</span>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th>原料No.</th><th>区分</th><th>原料名</th><th>類別</th>
-              <th>賞味期限</th><th>ステータス</th>
-              <th>製造会社</th><th>仕入商社</th>
-              <th>参考単価(円/kg)</th><th>保管場所</th><th></th>
+              <th style="width:80px">原料No.</th>
+              ${_matVisibleCols.map(col => `<th>${colLabels[col]}</th>`).join('')}
+              <th style="width:80px;text-align:center">操作</th>
             </tr>
           </thead>
           <tbody>
             ${mats.map(m => `
               <tr>
-                <td style="font-family:monospace;font-size:12px">${escHtml(m.material_no||'')}</td>
-                <td style="font-size:12px">${escHtml(m.category||'')}</td>
-                <td><strong>${escHtml(m.name||'')}</strong></td>
-                <td style="font-size:12px">${escHtml(m.classification||'')}</td>
-                <td style="font-size:12px;white-space:nowrap">${m.expiry_date ? formatDate(m.expiry_date) : '-'}</td>
-                <td>${materialStatusBadge(m.status)}</td>
-                <td style="font-size:12px">${escHtml(m.manufacturer||'')}</td>
-                <td style="font-size:12px">${escHtml(m.trading_company||'')}</td>
-                <td style="text-align:right">${m.unit_price != null ? Number(m.unit_price).toLocaleString() : ''}</td>
-                <td style="font-size:12px">${escHtml(m.sample_location||'')}</td>
+                <td style="font-family:monospace;font-size:12px;font-weight:600">${escHtml(m.material_no||'')}</td>
+                ${_matVisibleCols.map(col => {
+                  let cellHtml = '';
+                  if (col === 'category') cellHtml = `<td style="font-size:12px">${escHtml(m.category||'')}</td>`;
+                  else if (col === 'name') cellHtml = `<td><strong>${escHtml(m.name||'')}</strong></td>`;
+                  else if (col === 'class') cellHtml = `<td style="font-size:12px">${escHtml(m.classification||'')}</td>`;
+                  else if (col === 'expiry_date') cellHtml = `<td style="font-size:12px;white-space:nowrap">${m.expiry_date ? formatDate(m.expiry_date) : '-'}</td>`;
+                  else if (col === 'status') cellHtml = `<td>${materialStatusBadge(m.status)}</td>`;
+                  else if (col === 'manufacturer') cellHtml = `<td style="font-size:12px">${escHtml(m.manufacturer||'')}</td>`;
+                  else if (col === 'supplier') cellHtml = `<td style="font-size:12px">${escHtml(m.supplier||'')}</td>`;
+                  else if (col === 'price') cellHtml = `<td style="text-align:right;font-size:12px">${m.unit_price != null ? Number(m.unit_price).toLocaleString() : ''}</td>`;
+                  else if (col === 'storage') cellHtml = `<td style="font-size:12px">${escHtml(m.sample_location||'')}</td>`;
+                  return cellHtml;
+                }).join('')}
                 <td class="col-actions">
                   <button class="btn btn-xs btn-secondary" onclick="openMatModal('${m.id}')">編集</button>
                   <button class="btn btn-xs btn-danger" onclick="deleteMat('${m.id}')">削除</button>
                 </td>
-              </tr>`).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--gray-400);padding:32px">データがありません</td></tr>'}
+              </tr>`).join('') || '<tr><td colspan="${_matVisibleCols.length + 2}" style="text-align:center;color:var(--gray-400);padding:32px">データがありません</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -100,6 +153,63 @@ function matSortBtn(key, label) {
   const arrow  = active ? (_matSortAsc ? ' ↑' : ' ↓') : '';
   return `<button class="sort-btn${active?' active':''}"
     onclick="_matSortKey='${key}';_matSortAsc=${active?!_matSortAsc:true};renderMaterialsInner(cacheMaterials||[])">${label}${arrow}</button>`;
+}
+
+function toggleMatFilter() {
+  _matShowFilter = !_matShowFilter;
+  const p = document.getElementById('matFilterCard');
+  if (p) p.style.display = _matShowFilter ? 'block' : 'none';
+}
+
+function toggleMatColSel() {
+  _matShowColSel = !_matShowColSel;
+  const p = document.getElementById('matColPanel');
+  if (p) p.style.display = _matShowColSel ? 'block' : 'none';
+}
+
+function toggleMatCol(col, checked) {
+  if (checked) {
+    if (!_matVisibleCols.includes(col)) _matVisibleCols.push(col);
+  } else {
+    _matVisibleCols = _matVisibleCols.filter(c => c !== col);
+  }
+  renderMaterialsInner(cacheMaterials||[]);
+}
+
+function applyMatFilter() {
+  const keyword = (document.getElementById('f-mat-keyword')?.value || '').toLowerCase();
+  const categories = [...document.querySelectorAll('.f-mat-category:checked')].map(el => el.value);
+  const statuses = [...document.querySelectorAll('.f-mat-status:checked')].map(el => el.value);
+
+  _matFilter = keyword;
+
+  let mats = cacheMaterials || [];
+  if (keyword) {
+    const q = keyword.toLowerCase();
+    mats = mats.filter(m =>
+      (m.material_no||'').toLowerCase().includes(q) ||
+      (m.name||'').toLowerCase().includes(q) ||
+      (m.category||'').toLowerCase().includes(q) ||
+      (m.manufacturer||'').toLowerCase().includes(q)
+    );
+  }
+  if (categories.length > 0) {
+    mats = mats.filter(m => categories.includes(m.category));
+  }
+  if (statuses.length > 0) {
+    mats = mats.filter(m => statuses.includes(m.status));
+  }
+
+  renderMaterialsInner(mats);
+}
+
+function clearMatFilter() {
+  _matFilter = '';
+  document.getElementById('f-mat-keyword').value = '';
+  document.querySelectorAll('.f-mat-category, .f-mat-status').forEach(el => el.checked = false);
+  _matSortKey = 'material_no';
+  _matSortAsc = true;
+  renderMaterialsInner(cacheMaterials||[]);
 }
 
 function renderMatModal() {
