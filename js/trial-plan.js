@@ -208,8 +208,8 @@ function renderTrialRow(t, visibleCols) {
   const cellMap = {
     status: () => statusBadge(t.status || '計画中'),
     food_type: () => escHtml(foodTypeLabel(t.food_type)),
-    food_a: () => `<span style="color:#1d4ed8;font-weight:600">A:</span> ${escHtml(t.food_a_overview || '-')}`,
-    food_b: () => `<span style="color:#b45309;font-weight:600">B:</span> ${escHtml(t.food_b_overview || '-')}`,
+    food_a: () => `${escHtml(t.food_a_overview || '-')}`,
+    food_b: () => `${escHtml(t.food_b_overview || '-')}`,
     person: () => escHtml(t.person_in_charge || ''),
     purpose: () => escHtml(t.purpose || ''),
     notes: () => `<span style="font-size:11px">${escHtml(t.notes || '')}</span>`,
